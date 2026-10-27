@@ -1,0 +1,483 @@
+{
+  "info": {
+    "name": "Sample API",
+    "description": "Generated from endpoint metadata. Set the `baseUrl` variable and, for protected endpoints, the `token` variable.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "GetAll",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Customers"
+              ]
+            },
+            "description": "**GET** `/api/Customers`\n\nController: `Customers` · Action: `GetAll`"
+          },
+          "response": []
+        },
+        {
+          "name": "Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/Customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Customers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Ada Example\",\n  \"email\": \"ada@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "**POST** `/api/Customers`\n\nController: `Customers` · Action: `Create`\n\nBody example (complete); sources:\n- `FullName`: ExternalMetadata (config/examples.sample-api.json: properties[CreateCustomerRequest.FullName])\n- `Email`: ExternalMetadata (config/examples.sample-api.json: properties[CreateCustomerRequest.Email])"
+          },
+          "response": []
+        },
+        {
+          "name": "GetById",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Customers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Customers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "description": "**GET** `/api/Customers/{id:int}`\n\nController: `Customers` · Action: `GetById`\n\nParameters:\n- `id` (path): int, required"
+          },
+          "response": []
+        },
+        {
+          "name": "Update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/Customers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Customers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Ada Example\",\n  \"email\": \"ada@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "**PUT** `/api/Customers/{id:int}`\n\nController: `Customers` · Action: `Update`\n\nParameters:\n- `id` (path): int, required\n\nBody example (complete); sources:\n- `FullName`: ExternalMetadata (config/examples.sample-api.json: properties[UpdateCustomerRequest.FullName])\n- `Email`: ExternalMetadata (config/examples.sample-api.json: properties[UpdateCustomerRequest.Email])"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Customers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Customers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "description": "**DELETE** `/api/Customers/{id:int}`\n\nController: `Customers` · Action: `Delete`\n\nParameters:\n- `id` (path): int, required"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "GetAll",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Orders"
+              ]
+            },
+            "description": "**GET** `/api/Orders`\n\nController: `Orders` · Action: `GetAll`"
+          },
+          "response": []
+        },
+        {
+          "name": "Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/Orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": 1,\n  \"productId\": 1,\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "**POST** `/api/Orders`\n\nController: `Orders` · Action: `Create`\n\nBody example (complete); sources:\n- `CustomerId`: ExternalMetadata (config/examples.sample-api.json: properties[CreateOrderRequest.CustomerId])\n- `ProductId`: ExternalMetadata (config/examples.sample-api.json: properties[CreateOrderRequest.ProductId])\n- `Quantity`: ExternalMetadata (config/examples.sample-api.json: properties[CreateOrderRequest.Quantity])"
+          },
+          "response": []
+        },
+        {
+          "name": "GetById",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Orders/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Orders",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "description": "**GET** `/api/Orders/{id:int}`\n\nController: `Orders` · Action: `GetById`\n\nParameters:\n- `id` (path): int, required"
+          },
+          "response": []
+        },
+        {
+          "name": "Update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/Orders/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Orders",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "**PUT** `/api/Orders/{id:int}`\n\nController: `Orders` · Action: `Update`\n\nParameters:\n- `id` (path): int, required\n\nBody example (complete); sources:\n- `Quantity`: ExternalMetadata (config/examples.sample-api.json: properties[UpdateOrderRequest.Quantity])"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Orders/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Orders",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "description": "**DELETE** `/api/Orders/{id:int}`\n\nController: `Orders` · Action: `Delete`\n\nParameters:\n- `id` (path): int, required"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "GetAll",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Products"
+              ]
+            },
+            "description": "**GET** `/api/Products`\n\nController: `Products` · Action: `GetAll`"
+          },
+          "response": []
+        },
+        {
+          "name": "Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/Products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Laptop\",\n  \"price\": 1299.9\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "**POST** `/api/Products`\n\nController: `Products` · Action: `Create`\n\nBody example (complete); sources:\n- `Name`: ExternalMetadata (config/examples.sample-api.json: properties[CreateProductRequest.Name])\n- `Price`: ExternalMetadata (config/examples.sample-api.json: properties[CreateProductRequest.Price])"
+          },
+          "response": []
+        },
+        {
+          "name": "GetById",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "description": "**GET** `/api/Products/{id:int}`\n\nController: `Products` · Action: `GetById`\n\nParameters:\n- `id` (path): int, required\n\nExample response 200 (from ExternalMetadata; not a recorded response):\n```json\n{\n  \"id\": 1,\n  \"name\": \"Laptop\",\n  \"price\": 1299.9\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/Products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Laptop Pro\",\n  \"price\": 1499.9\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "**PUT** `/api/Products/{id:int}`\n\nController: `Products` · Action: `Update`\n\nParameters:\n- `id` (path): int, required\n\nBody example (complete); sources:\n- `Name`: ExternalMetadata (config/examples.sample-api.json: properties[UpdateProductRequest.Name])\n- `Price`: ExternalMetadata (config/examples.sample-api.json: properties[UpdateProductRequest.Price])"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "description": "**DELETE** `/api/Products/{id:int}`\n\nController: `Products` · Action: `Delete`\n\nParameters:\n- `id` (path): int, required"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "description": "Base address of the API."
+    },
+    {
+      "key": "token",
+      "value": "",
+      "description": "Bearer token for protected endpoints. Never commit a real token."
+    }
+  ]
+}

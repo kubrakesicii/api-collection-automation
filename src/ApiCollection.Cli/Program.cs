@@ -2,16 +2,38 @@ using System.Text.Json.Nodes;
 using ApiCollection.Analysis.Discovery;
 using ApiCollection.Core.Models;
 using ApiCollection.Infrastructure.Configuration;
+using ApiCollection.Postman.Generation;
+using ApiCollection.Postman.Serialization;
 
-const string Usage = "Usage: ApiCollection.Cli discover <api-source-directory> [--examples <example-metadata.json>]";
+const string Usage = """
+    Usage:
+      ApiCollection.Cli discover <api-source-directory> [--examples <example-metadata.json>]
+      ApiCollection.Cli generate <api-source-directory> [--examples <example-metadata.json>] [--name <collection-name>] [--base-url <url>] [--out <file.json>]
 
-if (args.Length < 2 || args[0] != "discover" || (args.Length != 2 && !(args.Length == 4 && args[2] == "--examples")))
+    'generate' builds a Postman Collection v2.1 file locally; nothing is sent to Postman.
+    """;
+
+if (args.Length < 2 || args[0] is not ("discover" or "generate"))
 {
     Console.Error.WriteLine(Usage);
     return 1;
 }
 
+var command = args[0];
 var directory = args[1];
+var allowed = command == "discover" ? new[] { "--examples" } : ["--examples", "--name", "--base-url", "--out"];
+var options = new Dictionary<string, string>();
+for (var i = 2; i < args.Length; i += 2)
+{
+    if (!allowed.Contains(args[i]) || i + 1 >= args.Length || options.ContainsKey(args[i]))
+    {
+        Console.Error.WriteLine(Usage);
+        return 1;
+    }
+
+    options[args[i]] = args[i + 1];
+}
+
 if (!Directory.Exists(directory))
 {
     Console.Error.WriteLine($"Directory not found: {directory}");
@@ -19,11 +41,11 @@ if (!Directory.Exists(directory))
 }
 
 ExampleMetadata? examples = null;
-if (args.Length == 4)
+if (options.TryGetValue("--examples", out var examplesPath))
 {
     try
     {
-        examples = ExampleMetadataLoader.Load(args[3]);
+        examples = ExampleMetadataLoader.Load(examplesPath);
     }
     catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
     {
@@ -33,6 +55,30 @@ if (args.Length == 4)
 }
 
 var result = new EndpointDiscoveryEngine().DiscoverFromDirectory(directory, examples);
+
+if (command == "generate")
+{
+    var collection = new PostmanCollectionGenerator().Generate(result.Endpoints, new PostmanCollectionOptions
+    {
+        Name = options.GetValueOrDefault("--name", "API Collection"),
+        BaseUrl = options.GetValueOrDefault("--base-url", "http://localhost:5000")
+    });
+    var json = PostmanCollectionSerializer.Serialize(collection);
+
+    if (options.TryGetValue("--out", out var outputPath))
+    {
+        File.WriteAllText(outputPath, json);
+        Console.WriteLine($"Wrote {outputPath}");
+    }
+    else
+    {
+        Console.WriteLine(json);
+    }
+
+    // Summary goes to stderr so stdout stays a pure collection document.
+    Console.Error.WriteLine($"{result.Endpoints.Count} endpoint(s) in {collection.Items.Count} folder(s); {result.Warnings.Count} warning(s), {result.ExampleDiagnostics.Count} example diagnostic(s).");
+    return 0;
+}
 
 foreach (var endpoint in result.Endpoints)
 {
