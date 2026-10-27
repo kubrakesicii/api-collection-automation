@@ -1,4 +1,5 @@
 using ApiCollection.Analysis.Discovery;
+using ApiCollection.Core.Models;
 
 namespace ApiCollection.Analysis.Tests;
 
@@ -38,5 +39,33 @@ public sealed class SampleApiDiscoveryTests
         Assert.Equal(expected.OrderBy(s => s, StringComparer.Ordinal), actual.OrderBy(s => s, StringComparer.Ordinal));
         Assert.Empty(result.Warnings);
         Assert.Equal(actual.Count, result.Endpoints.Select(e => e.Id).Distinct().Count());
+    }
+
+    [Fact]
+    public void Sample_api_parameters_and_request_bodies_are_extracted()
+    {
+        var result = new EndpointDiscoveryEngine().DiscoverFromDirectory(SampleApiDirectory());
+
+        var getById = result.Endpoints.Single(e => e.ControllerName == "Products" && e.ActionName == "GetById");
+        var id = Assert.Single(getById.Parameters);
+        Assert.Equal(("id", ParameterLocation.Path, "int", true), (id.Name, id.Location, id.TypeName, id.IsRequired));
+        Assert.Null(getById.RequestBody);
+
+        var create = result.Endpoints.Single(e => e.ControllerName == "Products" && e.ActionName == "Create");
+        Assert.Equal("CreateProductRequest", create.RequestBody!.TypeName);
+        Assert.Equal(
+            ["Name:string:True", "Price:decimal:False"],
+            create.RequestBody.Properties.Select(p => $"{p.Name}:{p.TypeName}:{p.IsRequired}"));
+
+        var update = result.Endpoints.Single(e => e.ControllerName == "Orders" && e.ActionName == "Update");
+        Assert.Equal(["id", "request"], update.Parameters.Select(p => p.Name));
+        Assert.Equal("UpdateOrderRequest", update.RequestBody!.TypeName);
+
+        // SampleApi has no [Authorize] and no FluentValidation validators, so nothing may be reported for them.
+        Assert.All(result.Endpoints, e =>
+        {
+            Assert.False(e.Authentication.RequiresAuthentication);
+            Assert.Empty(e.Validation);
+        });
     }
 }

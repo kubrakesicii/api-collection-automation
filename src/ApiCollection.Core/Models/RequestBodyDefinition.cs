@@ -14,4 +14,5 @@ public sealed record PropertyDefinition
     public required string TypeName { get; init; }
     public bool IsRequired { get; init; }
     public bool IsNullable { get; init; }
+    public IReadOnlyList<PropertyDefinition> Properties { get; init; } = [];
 }

@@ -3,6 +3,7 @@ using ApiCollection.Core.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using static ApiCollection.Analysis.Discovery.SyntaxHelpers;
 
 namespace ApiCollection.Analysis.Discovery;
 
@@ -34,16 +35,24 @@ public sealed partial class EndpointDiscoveryEngine
 
     public EndpointDiscoveryResult DiscoverFromSources(IEnumerable<string> sources)
     {
+        var texts = sources.ToList();
         var warnings = new List<string>();
-        var classes = CollectClasses(sources);
+        var roots = texts.Select(text => CSharpSyntaxTree.ParseText(text).GetRoot()).ToList();
+        var classes = CollectClasses(roots);
+        var extractor = new EndpointMetadataExtractor(new SourceCatalog(roots));
         var endpoints = new List<EndpointDefinition>();
+
+        if (texts.Any(t => t.Contains("RequireAuthorization(", StringComparison.Ordinal) || t.Contains("FallbackPolicy", StringComparison.Ordinal)))
+        {
+            warnings.Add("Global authorization (RequireAuthorization/FallbackPolicy) is not analyzed; authentication reflects [Authorize]/[AllowAnonymous] attributes only.");
+        }
 
         foreach (var group in classes.Where(IsConcretePublicClass))
         {
             var chain = BuildChain(group, classes, out var reachesFramework);
             if (IsController(group, chain, reachesFramework))
             {
-                endpoints.AddRange(DiscoverController(group, chain, warnings));
+                endpoints.AddRange(DiscoverController(group, chain, extractor, warnings));
             }
         }
 
@@ -67,14 +76,13 @@ public sealed partial class EndpointDiscoveryEngine
 
     private sealed record ClassGroup(string Name, string Namespace, List<ClassDeclarationSyntax> Declarations);
 
-    private static List<ClassGroup> CollectClasses(IEnumerable<string> sources)
+    private static List<ClassGroup> CollectClasses(IEnumerable<SyntaxNode> roots)
     {
         var groups = new List<ClassGroup>();
         var byFullName = new Dictionary<string, ClassGroup>();
 
-        foreach (var source in sources)
+        foreach (var root in roots)
         {
-            var root = CSharpSyntaxTree.ParseText(source).GetRoot();
             foreach (var declaration in root.DescendantNodes().OfType<ClassDeclarationSyntax>())
             {
                 var ns = string.Join('.', declaration.Ancestors().OfType<BaseNamespaceDeclarationSyntax>()
@@ -159,8 +167,9 @@ public sealed partial class EndpointDiscoveryEngine
     // ---- endpoint discovery ----
 
     private static IEnumerable<EndpointDefinition> DiscoverController(
-        ClassGroup group, List<ClassGroup> chain, List<string> warnings)
+        ClassGroup group, List<ClassGroup> chain, EndpointMetadataExtractor extractor, List<string> warnings)
     {
+        var classAttributes = chain.SelectMany(g => g.Declarations).SelectMany(Attributes).ToList();
         var controllerName = group.Name.Length > "Controller".Length && group.Name.EndsWith("Controller", StringComparison.Ordinal)
             ? group.Name[..^"Controller".Length]
             : group.Name;
@@ -254,6 +263,7 @@ public sealed partial class EndpointDiscoveryEngine
                             warnings.Add($"{owner}: route '{route}' contains an unsupported token.");
                         }
 
+                        var metadata = extractor.Extract(method, classAttributes, route, owner, warnings);
                         yield return new EndpointDefinition
                         {
                             // Provisional identity (method + route); a stable ID scheme is a later task.
@@ -261,7 +271,11 @@ public sealed partial class EndpointDiscoveryEngine
                             ControllerName = controllerName,
                             ActionName = method.Identifier.Text,
                             HttpMethod = httpMethod,
-                            RouteTemplate = route
+                            RouteTemplate = route,
+                            Parameters = metadata.Parameters,
+                            RequestBody = metadata.RequestBody,
+                            Authentication = metadata.Authentication,
+                            Validation = metadata.Validation
                         };
                     }
                 }
@@ -337,62 +351,6 @@ public sealed partial class EndpointDiscoveryEngine
 
     // ---- syntax helpers ----
 
-    private static IEnumerable<AttributeSyntax> Attributes(MemberDeclarationSyntax member) =>
-        member.AttributeLists.SelectMany(l => l.Attributes);
-
     private static bool HasAttribute(ClassGroup group, string name) =>
         group.Declarations.SelectMany(Attributes).Any(a => AttributeName(a) == name);
-
-    private static string AttributeName(AttributeSyntax attribute)
-    {
-        var name = LastIdentifier(attribute.Name);
-        return name.EndsWith("Attribute", StringComparison.Ordinal) && name.Length > "Attribute".Length
-            ? name[..^"Attribute".Length]
-            : name;
-    }
-
-    private static string LastIdentifier(TypeSyntax type) => type switch
-    {
-        QualifiedNameSyntax qualified => LastIdentifier(qualified.Right),
-        AliasQualifiedNameSyntax alias => alias.Name.Identifier.Text,
-        SimpleNameSyntax simple => simple.Identifier.Text,
-        _ => type.ToString()
-    };
-
-    private static ExpressionSyntax? TemplateArgument(AttributeSyntax attribute)
-    {
-        foreach (var argument in attribute.ArgumentList?.Arguments ?? [])
-        {
-            if (argument.NameEquals is null && argument.NameColon is null)
-            {
-                return argument.Expression;
-            }
-
-            if (argument.NameEquals?.Name.Identifier.Text == "Template" || argument.NameColon?.Name.Identifier.Text == "template")
-            {
-                return argument.Expression;
-            }
-        }
-
-        return null;
-    }
-
-    private static bool TryEvaluate(ExpressionSyntax expression, out string value)
-    {
-        switch (expression)
-        {
-            case LiteralExpressionSyntax literal when literal.IsKind(SyntaxKind.StringLiteralExpression):
-                value = literal.Token.ValueText;
-                return true;
-            case ParenthesizedExpressionSyntax parenthesized:
-                return TryEvaluate(parenthesized.Expression, out value);
-            case BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.AddExpression)
-                && TryEvaluate(binary.Left, out var left) && TryEvaluate(binary.Right, out var right):
-                value = left + right;
-                return true;
-            default:
-                value = string.Empty;
-                return false;
-        }
-    }
 }
