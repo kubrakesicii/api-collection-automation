@@ -22,14 +22,23 @@ internal sealed class SourceCatalog
     ];
 
     private readonly List<TypeDeclarationSyntax> _types;
-    private readonly HashSet<string> _enums;
+    private readonly Dictionary<string, List<string>> _enums = [];
 
     public SourceCatalog(IReadOnlyList<SyntaxNode> roots)
     {
         _types = roots.SelectMany(r => r.DescendantNodes().OfType<TypeDeclarationSyntax>()).ToList();
-        _enums = roots.SelectMany(r => r.DescendantNodes().OfType<EnumDeclarationSyntax>())
-            .Select(e => e.Identifier.Text).ToHashSet();
+        foreach (var declaration in roots.SelectMany(r => r.DescendantNodes().OfType<EnumDeclarationSyntax>()))
+        {
+            if (!_enums.TryGetValue(declaration.Identifier.Text, out var members))
+            {
+                _enums[declaration.Identifier.Text] = members = [];
+            }
+
+            members.AddRange(declaration.Members.Select(m => m.Identifier.Text));
+        }
     }
+
+    public IReadOnlyList<string> EnumMembers(string name) => _enums.GetValueOrDefault(name) ?? [];
 
     public IReadOnlyList<TypeDeclarationSyntax> Types => _types;
 
@@ -37,7 +46,7 @@ internal sealed class SourceCatalog
     public List<TypeDeclarationSyntax> FindTypes(string name) =>
         _types.Where(t => t.Identifier.Text == name && t is not InterfaceDeclarationSyntax).ToList();
 
-    public bool IsEnum(string name) => _enums.Contains(name);
+    public bool IsEnum(string name) => _enums.ContainsKey(name);
 
     /// <summary>True for primitives, common BCL value-like types and enums declared in the source.</summary>
     public bool IsSimpleType(TypeSyntax element) =>

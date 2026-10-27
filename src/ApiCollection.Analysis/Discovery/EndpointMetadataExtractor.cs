@@ -21,10 +21,10 @@ internal sealed partial class EndpointMetadataExtractor
     private readonly DtoModelBuilder _dto;
     private readonly ValidationExtractor _validation;
 
-    public EndpointMetadataExtractor(SourceCatalog catalog)
+    public EndpointMetadataExtractor(SourceCatalog catalog, DtoModelBuilder dto)
     {
         _catalog = catalog;
-        _dto = new DtoModelBuilder(catalog);
+        _dto = dto;
         _validation = new ValidationExtractor(catalog);
     }
 

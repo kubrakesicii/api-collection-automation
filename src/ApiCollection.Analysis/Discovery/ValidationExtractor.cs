@@ -273,10 +273,4 @@ internal sealed class ValidationExtractor
 
         return null;
     }
-
-    private static string Shorten(SyntaxNode node)
-    {
-        var text = string.Join(' ', node.ToString().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-        return text.Length <= 60 ? text : text[..57] + "...";
-    }
 }

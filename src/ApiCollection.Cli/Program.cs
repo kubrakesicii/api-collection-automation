@@ -1,9 +1,13 @@
+using System.Text.Json.Nodes;
 using ApiCollection.Analysis.Discovery;
 using ApiCollection.Core.Models;
+using ApiCollection.Infrastructure.Configuration;
 
-if (args.Length != 2 || args[0] != "discover")
+const string Usage = "Usage: ApiCollection.Cli discover <api-source-directory> [--examples <example-metadata.json>]";
+
+if (args.Length < 2 || args[0] != "discover" || (args.Length != 2 && !(args.Length == 4 && args[2] == "--examples")))
 {
-    Console.Error.WriteLine("Usage: ApiCollection.Cli discover <api-source-directory>");
+    Console.Error.WriteLine(Usage);
     return 1;
 }
 
@@ -14,7 +18,21 @@ if (!Directory.Exists(directory))
     return 1;
 }
 
-var result = new EndpointDiscoveryEngine().DiscoverFromDirectory(directory);
+ExampleMetadata? examples = null;
+if (args.Length == 4)
+{
+    try
+    {
+        examples = ExampleMetadataLoader.Load(args[3]);
+    }
+    catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
+    {
+        Console.Error.WriteLine($"Cannot read example metadata: {exception.Message}");
+        return 1;
+    }
+}
+
+var result = new EndpointDiscoveryEngine().DiscoverFromDirectory(directory, examples);
 
 foreach (var endpoint in result.Endpoints)
 {
@@ -29,6 +47,7 @@ foreach (var endpoint in result.Endpoints)
     {
         Console.WriteLine($"          body {body.TypeName}{(body.IsRequired ? " (required)" : "")}");
         PrintProperties(body.Properties, "            ");
+        PrintExample("request example", body.Example);
     }
 
     var auth = endpoint.Authentication;
@@ -47,12 +66,22 @@ foreach (var endpoint in result.Endpoints)
     {
         Console.WriteLine($"          validation: {rule.PropertyName} {rule.RuleName}({string.Join(", ", rule.Arguments)})");
     }
+
+    foreach (var response in endpoint.Responses.Where(r => r.Example is not null))
+    {
+        PrintExample($"response example {response.StatusCode}", response.Example);
+    }
 }
 
-Console.WriteLine($"{result.Endpoints.Count} endpoint(s), {result.Warnings.Count} warning(s)");
+Console.WriteLine($"{result.Endpoints.Count} endpoint(s), {result.Warnings.Count} warning(s), {result.ExampleDiagnostics.Count} example diagnostic(s)");
 foreach (var warning in result.Warnings)
 {
     Console.WriteLine($"WARN {warning}");
+}
+
+foreach (var diagnostic in result.ExampleDiagnostics)
+{
+    Console.WriteLine($"{diagnostic.Code} {diagnostic.Endpoint ?? "-"} [{diagnostic.Target}] {diagnostic.Message}");
 }
 
 return 0;
@@ -63,5 +92,21 @@ static void PrintProperties(IReadOnlyList<PropertyDefinition> properties, string
     {
         Console.WriteLine($"{indent}{property.Name}: {property.TypeName}{(property.IsRequired ? " (required)" : "")}");
         PrintProperties(property.Properties, indent + "  ");
+    }
+}
+
+static void PrintExample(string label, ExampleDefinition? example)
+{
+    if (example is null)
+    {
+        return;
+    }
+
+    var state = example.IsComplete ? "complete" : $"incomplete, missing: {string.Join(", ", example.MissingFields)}";
+    Console.WriteLine($"          {label} ({state}):");
+    Console.WriteLine($"            {JsonNode.Parse(example.Json)?.ToJsonString()}");
+    foreach (var field in example.Fields)
+    {
+        Console.WriteLine($"            source {field.Path} <- {field.Source} [{field.SourceDetail}]");
     }
 }

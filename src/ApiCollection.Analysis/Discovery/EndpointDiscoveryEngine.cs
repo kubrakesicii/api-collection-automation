@@ -24,27 +24,45 @@ public sealed partial class EndpointDiscoveryEngine
         ["HttpOptions"] = HttpMethodKind.Options
     };
 
-    public EndpointDiscoveryResult DiscoverFromDirectory(string directory)
+    /// <param name="directory">Root of the analyzed API source; files are only read.</param>
+    /// <param name="examples">Optional curated example metadata for values that cannot be found in code.</param>
+    public EndpointDiscoveryResult DiscoverFromDirectory(string directory, ExampleMetadata? examples = null)
     {
         var files = Directory.EnumerateFiles(directory, "*.cs", SearchOption.AllDirectories)
             .Where(path => !IsBuildOutput(Path.GetRelativePath(directory, path)))
-            .OrderBy(path => path, StringComparer.Ordinal);
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .Select(path => (Path: Path.GetRelativePath(directory, path).Replace('\\', '/'), Text: File.ReadAllText(path)));
 
-        return DiscoverFromSources(files.Select(File.ReadAllText));
+        return Discover(files.ToList(), examples);
     }
 
-    public EndpointDiscoveryResult DiscoverFromSources(IEnumerable<string> sources)
+    public EndpointDiscoveryResult DiscoverFromSources(IEnumerable<string> sources, ExampleMetadata? examples = null) =>
+        Discover(sources.Select(text => (Path: string.Empty, Text: text)).ToList(), examples);
+
+    private static EndpointDiscoveryResult Discover(List<(string Path, string Text)> files, ExampleMetadata? examples)
     {
-        var texts = sources.ToList();
         var warnings = new List<string>();
-        var roots = texts.Select(text => CSharpSyntaxTree.ParseText(text).GetRoot()).ToList();
+        var exampleDiagnostics = new List<ExampleDiagnostic>();
+        var roots = files.Select(f => CSharpSyntaxTree.ParseText(f.Text, path: f.Path).GetRoot()).ToList();
         var classes = CollectClasses(roots);
-        var extractor = new EndpointMetadataExtractor(new SourceCatalog(roots));
+        var catalog = new SourceCatalog(roots);
+        var dto = new DtoModelBuilder(catalog, exampleDiagnostics);
+        var extractor = new EndpointMetadataExtractor(catalog, dto);
+        var exampleBuilder = new ExampleBuilder(catalog, dto, examples, exampleDiagnostics, warnings);
         var endpoints = new List<EndpointDefinition>();
+        var texts = files.Select(f => f.Text).ToList();
 
         if (texts.Any(t => t.Contains("RequireAuthorization(", StringComparison.Ordinal) || t.Contains("FallbackPolicy", StringComparison.Ordinal)))
         {
             warnings.Add("Global authorization (RequireAuthorization/FallbackPolicy) is not analyzed; authentication reflects [Authorize]/[AllowAnonymous] attributes only.");
+        }
+
+        if (texts.Any(t => t.Contains("JsonNamingPolicy", StringComparison.Ordinal) || t.Contains("PropertyNamingPolicy", StringComparison.Ordinal)
+            || t.Contains("AddJsonOptions", StringComparison.Ordinal)))
+        {
+            exampleDiagnostics.Add(new ExampleDiagnostic(
+                "EX006", null, "serializer",
+                "JSON serializer options appear to be customized; example property names assume the ASP.NET Core default (camelCase) unless [JsonPropertyName] is used."));
         }
 
         foreach (var group in classes.Where(IsConcretePublicClass))
@@ -52,7 +70,7 @@ public sealed partial class EndpointDiscoveryEngine
             var chain = BuildChain(group, classes, out var reachesFramework);
             if (IsController(group, chain, reachesFramework))
             {
-                endpoints.AddRange(DiscoverController(group, chain, extractor, warnings));
+                endpoints.AddRange(DiscoverController(group, chain, extractor, exampleBuilder, warnings));
             }
         }
 
@@ -64,7 +82,9 @@ public sealed partial class EndpointDiscoveryEngine
             .ThenBy(e => e.ActionName, StringComparer.Ordinal)
             .ToList();
 
-        return new EndpointDiscoveryResult(ordered, warnings.Distinct().ToList());
+        exampleBuilder.ReportUnmatchedMetadata(ordered);
+
+        return new EndpointDiscoveryResult(ordered, warnings.Distinct().ToList(), exampleDiagnostics.Distinct().ToList());
     }
 
     private static bool IsBuildOutput(string relativePath) =>
@@ -167,7 +187,7 @@ public sealed partial class EndpointDiscoveryEngine
     // ---- endpoint discovery ----
 
     private static IEnumerable<EndpointDefinition> DiscoverController(
-        ClassGroup group, List<ClassGroup> chain, EndpointMetadataExtractor extractor, List<string> warnings)
+        ClassGroup group, List<ClassGroup> chain, EndpointMetadataExtractor extractor, ExampleBuilder examples, List<string> warnings)
     {
         var classAttributes = chain.SelectMany(g => g.Declarations).SelectMany(Attributes).ToList();
         var controllerName = group.Name.Length > "Controller".Length && group.Name.EndsWith("Controller", StringComparison.Ordinal)
@@ -263,17 +283,21 @@ public sealed partial class EndpointDiscoveryEngine
                             warnings.Add($"{owner}: route '{route}' contains an unsupported token.");
                         }
 
+                        // Provisional identity (method + route); a stable ID scheme is a later task.
+                        var id = $"{httpMethod.ToString().ToUpperInvariant()} {route}";
                         var metadata = extractor.Extract(method, classAttributes, route, owner, warnings);
                         yield return new EndpointDefinition
                         {
-                            // Provisional identity (method + route); a stable ID scheme is a later task.
-                            Id = $"{httpMethod.ToString().ToUpperInvariant()} {route}",
+                            Id = id,
                             ControllerName = controllerName,
                             ActionName = method.Identifier.Text,
                             HttpMethod = httpMethod,
                             RouteTemplate = route,
                             Parameters = metadata.Parameters,
-                            RequestBody = metadata.RequestBody,
+                            RequestBody = metadata.RequestBody is null
+                                ? null
+                                : metadata.RequestBody with { Example = examples.BuildRequestExample(id, metadata.RequestBody) },
+                            Responses = examples.BuildResponses(id, method, owner),
                             Authentication = metadata.Authentication,
                             Validation = metadata.Validation
                         };

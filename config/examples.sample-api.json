@@ -1,0 +1,23 @@
+{
+  // Curated example values for sample-api. Fictional data only: never put secrets or real customer data here.
+  // Sections: "properties" (Type.Property), "requests" and "responses" (endpoint Id, e.g. "POST api/Products").
+  "properties": {
+    "CreateProductRequest.Name": "Laptop",
+    "CreateProductRequest.Price": 1299.9,
+    "UpdateProductRequest.Name": "Laptop Pro",
+    "UpdateProductRequest.Price": 1499.9,
+    "CreateCustomerRequest.FullName": "Ada Example",
+    "CreateCustomerRequest.Email": "ada@example.com",
+    "UpdateCustomerRequest.FullName": "Ada Example",
+    "UpdateCustomerRequest.Email": "ada@example.com",
+    "CreateOrderRequest.CustomerId": 1,
+    "CreateOrderRequest.ProductId": 1,
+    "CreateOrderRequest.Quantity": 2,
+    "UpdateOrderRequest.Quantity": 3
+  },
+  "responses": {
+    "GET api/Products/{id:int}": {
+      "200": { "id": 1, "name": "Laptop", "price": 1299.9 }
+    }
+  }
+}

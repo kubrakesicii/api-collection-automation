@@ -132,6 +132,33 @@ internal static class SyntaxHelpers
         _ => type
     };
 
+    /// <summary>The element of an array or common collection type (after removing nullability); null for other types.</summary>
+    public static TypeSyntax? CollectionElement(TypeSyntax type) => StripNullable(type) switch
+    {
+        ArrayTypeSyntax array => array.ElementType,
+        QualifiedNameSyntax qualified => CollectionElement(qualified.Right),
+        GenericNameSyntax generic when generic.TypeArgumentList.Arguments.Count == 1 && CollectionNames.Contains(generic.Identifier.Text)
+            => generic.TypeArgumentList.Arguments[0],
+        _ => null
+    };
+
+    public static bool IsCollection(TypeSyntax type) => CollectionElement(type) is not null;
+
+    /// <summary>Human-readable source location: "path:line" when the file is known, otherwise "line N".</summary>
+    public static string Describe(SyntaxNode node)
+    {
+        var span = node.GetLocation().GetLineSpan();
+        var line = span.StartLinePosition.Line + 1;
+        return string.IsNullOrEmpty(span.Path) ? $"line {line}" : $"{span.Path}:{line}";
+    }
+
+    /// <summary>Single-line, length-limited source text for diagnostics.</summary>
+    public static string Shorten(SyntaxNode node)
+    {
+        var text = string.Join(' ', node.ToString().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return text.Length <= 60 ? text : text[..57] + "...";
+    }
+
     public static bool IsNullableType(TypeSyntax type) =>
         type is NullableTypeSyntax or GenericNameSyntax { Identifier.Text: "Nullable" };
 }
