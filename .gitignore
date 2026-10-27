@@ -1,0 +1,50 @@
+# .NET build and generated output
+**/bin/
+**/obj/
+artifacts/
+*.nupkg
+*.snupkg
+
+# IDE and user-specific settings
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local environment and secrets (keep example templates)
+.env
+.env.*
+!.env.example
+!.env.*.example
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+*.pfx
+*.p12
+*.key
+.aws/
+.claude/settings.local.json
+
+# Test results and coverage
+**/TestResults/
+coverage/
+coverage-report/
+*.coverage
+*.coveragexml
+**/coverage.cobertura.xml
+**/coverage.opencover.xml
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
