@@ -261,7 +261,7 @@ public sealed class EndpointDiscoveryEngineTests
         var second = Engine.DiscoverFromSources(sources.Reverse()).Endpoints.Select(e => e.Id + "|" + e.ActionName).ToList();
 
         Assert.Equal(first, second);
-        Assert.Equal(["GET api/A/a|A", "GET api/A/z|Z", "GET api/B|G", "POST api/B|P"], first);
+        Assert.Equal(["GET /api/a/a|A", "GET /api/a/z|Z", "GET /api/b|G", "POST /api/b|P"], first);
     }
 
     [Fact]

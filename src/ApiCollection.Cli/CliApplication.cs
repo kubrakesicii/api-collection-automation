@@ -1,6 +1,8 @@
 using ApiCollection.Analysis.Discovery;
 using ApiCollection.Core.Models;
+using ApiCollection.Core.Snapshots;
 using ApiCollection.Infrastructure.Configuration;
+using ApiCollection.Infrastructure.FileSystem;
 using ApiCollection.Postman.Generation;
 using ApiCollection.Postman.Serialization;
 
@@ -19,17 +21,20 @@ public static class CliApplication
         Usage:
           ApiCollection.Cli discover <api-source-directory> [--examples <example-metadata.json>]
           ApiCollection.Cli generate <api-source-directory> [--examples <example-metadata.json>] [--name <collection-name>]
-                                     [--base-url <url>] [--out <collection.json>] [--report <report.json|report.txt>] [--strict]
+                                     [--base-url <url>] [--out <collection.json>] [--report <report.json|report.txt>]
+                                     [--snapshot <snapshot.json>] [--strict]
 
         'discover' prints the discovery report. 'generate' builds a Postman Collection v2.1 file locally; nothing is sent to Postman.
-        --out      write the collection to a file (otherwise it is printed to stdout)
-        --report   write the discovery report to a file: JSON for a .json extension, readable text otherwise
-        --strict   exit with code 2 when discovery reported warnings (example diagnostics do not count); files are still written
+        --out       write the collection to a file (otherwise it is printed to stdout)
+        --report    write the discovery report to a file: JSON for a .json extension, readable text otherwise
+        --snapshot  write the endpoint snapshot (identities, fingerprints, collection hash); an existing file is overwritten.
+                    Keep it next to the collection; it is the baseline later runs are compared against.
+        --strict    exit with code 2 when discovery reported warnings (example diagnostics do not count); files are still written
         The API source is only read, never built or run, and output files may not be placed inside it.
         """;
 
     private static readonly string[] DiscoverOptions = ["--examples"];
-    private static readonly string[] GenerateOptions = ["--examples", "--name", "--base-url", "--out", "--report"];
+    private static readonly string[] GenerateOptions = ["--examples", "--name", "--base-url", "--out", "--report", "--snapshot"];
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
@@ -85,6 +90,23 @@ public static class CliApplication
         });
         var json = PostmanCollectionSerializer.Serialize(collection);
 
+        // Built before anything is written, so an unusable snapshot (duplicate identities) fails the run without partial output.
+        AnalysisSnapshot? snapshot = null;
+        if (values.ContainsKey("--snapshot"))
+        {
+            try
+            {
+                snapshot = AnalysisSnapshot.Create(
+                    result.Endpoints,
+                    values.TryGetValue("--out", out var collectionPath) ? SnapshotCollection.FromJson(collectionPath, json) : null);
+            }
+            catch (ArgumentException exception)
+            {
+                error.WriteLine($"Cannot create the snapshot: {exception.Message}");
+                return Failure;
+            }
+        }
+
         // When the collection itself goes to stdout, status messages go to stderr to keep stdout a pure document.
         var status = values.ContainsKey("--out") ? output : error;
 
@@ -113,6 +135,21 @@ public static class CliApplication
             }
 
             status.WriteLine($"Wrote report {reportPath}");
+        }
+
+        if (snapshot is not null)
+        {
+            try
+            {
+                AnalysisSnapshotStore.Save(values["--snapshot"], snapshot);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                error.WriteLine($"Cannot write '{values["--snapshot"]}': {exception.Message}");
+                return Failure;
+            }
+
+            status.WriteLine($"Wrote snapshot {values["--snapshot"]}");
         }
 
         error.WriteLine($"{result.Endpoints.Count} endpoint(s) in {collection.Items.Count} folder(s); {result.Warnings.Count} warning(s), {result.ExampleDiagnostics.Count} example diagnostic(s).");
@@ -168,12 +205,18 @@ public static class CliApplication
 
     private static bool ValidateOutputs(string directory, Dictionary<string, string> values, TextWriter error)
     {
-        var outputs = new[] { "--out", "--report" }.Where(values.ContainsKey).Select(option => (Option: option, Path: values[option])).ToList();
+        var outputs = new[] { "--out", "--report", "--snapshot" }.Where(values.ContainsKey).Select(option => (Option: option, Path: values[option])).ToList();
 
-        if (outputs.Count == 2 && SamePath(outputs[0].Path, outputs[1].Path))
+        for (var i = 0; i < outputs.Count; i++)
         {
-            error.WriteLine("--out and --report must be different files.");
-            return false;
+            for (var j = i + 1; j < outputs.Count; j++)
+            {
+                if (SamePath(outputs[i].Path, outputs[j].Path))
+                {
+                    error.WriteLine($"{outputs[i].Option} and {outputs[j].Option} must be different files.");
+                    return false;
+                }
+            }
         }
 
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar;

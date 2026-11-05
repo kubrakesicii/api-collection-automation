@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using ApiCollection.Core.Identity;
 using ApiCollection.Core.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -81,6 +82,13 @@ public sealed partial class EndpointDiscoveryEngine
             .ThenBy(e => e.HttpMethod)
             .ThenBy(e => e.ActionName, StringComparer.Ordinal)
             .ToList();
+
+        foreach (var shared in ordered.GroupBy(e => e.Id).Where(g => g.Select(e => (e.ControllerName, e.ActionName)).Distinct().Count() > 1))
+        {
+            warnings.Add(
+                $"Endpoint identity '{shared.Key}' is produced by more than one action " +
+                $"({string.Join(", ", shared.Select(e => $"{e.ControllerName}.{e.ActionName}").Distinct())}); identities must be unique.");
+        }
 
         exampleBuilder.ReportUnmatchedMetadata(ordered);
 
@@ -283,8 +291,7 @@ public sealed partial class EndpointDiscoveryEngine
                             warnings.Add($"{owner}: route '{route}' contains an unsupported token.");
                         }
 
-                        // Provisional identity (method + route); a stable ID scheme is a later task.
-                        var id = $"{httpMethod.ToString().ToUpperInvariant()} {route}";
+                        var id = EndpointIdentity.Create(httpMethod, route);
                         var metadata = extractor.Extract(method, classAttributes, route, owner, warnings);
                         yield return new EndpointDefinition
                         {

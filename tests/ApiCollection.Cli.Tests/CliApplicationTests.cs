@@ -267,4 +267,96 @@ public sealed class CliApplicationTests : IDisposable
         Assert.Contains("15 endpoint(s), 0 warning(s)", output);
         Assert.Contains("source Name <- ExternalMetadata", output);
     }
+
+    // ---- snapshot ----
+
+    [Fact]
+    public void Snapshot_is_written_next_to_the_collection_and_references_its_hash()
+    {
+        var collection = InWork(Path.Combine("out", "sample.postman_collection.json"));
+        var snapshot = InWork(Path.Combine("out", "sample.snapshot.json"));
+
+        var (code, output, _) = Run("generate", SampleApi, "--examples", Examples, "--out", collection, "--snapshot", snapshot);
+
+        Assert.Equal(CliApplication.Success, code);
+        Assert.Contains($"Wrote snapshot {snapshot}", output);
+
+        using var json = JsonDocument.Parse(File.ReadAllText(snapshot));
+        var root = json.RootElement;
+        Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(15, root.GetProperty("endpoints").GetArrayLength());
+        Assert.Equal("sample.postman_collection.json", root.GetProperty("collection").GetProperty("fileName").GetString());
+        var expectedHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(collection))).ToLowerInvariant();
+        Assert.Equal(expectedHash, root.GetProperty("collection").GetProperty("sha256").GetString());
+    }
+
+    [Fact]
+    public void Snapshot_output_is_identical_across_runs_and_without_out_has_no_collection_reference()
+    {
+        var first = InWork("s1.json");
+        var second = InWork("s2.json");
+        Assert.Equal(0, Run("generate", SampleApi, "--snapshot", first).Code);
+        Assert.Equal(0, Run("generate", SampleApi, "--snapshot", second).Code);
+
+        Assert.Equal(File.ReadAllText(first), File.ReadAllText(second));
+        using var json = JsonDocument.Parse(File.ReadAllText(first));
+        Assert.False(json.RootElement.TryGetProperty("collection", out _));
+    }
+
+    [Fact]
+    public void The_cli_reproduces_the_committed_baseline_snapshot()
+    {
+        var collection = InWork("sample-api.postman_collection.json");
+        var snapshot = InWork("sample-api.snapshot.json");
+
+        var (code, _, _) = Run("generate", SampleApi, "--examples", Examples, "--name", "Sample API", "--out", collection, "--snapshot", snapshot);
+
+        Assert.Equal(CliApplication.Success, code);
+        var fixtures = Path.Combine(RepositoryRoot(), "fixtures", "postman");
+        Assert.Equal(File.ReadAllText(Path.Combine(fixtures, "sample-api.snapshot.json")).Replace("\r\n", "\n"), File.ReadAllText(snapshot));
+        Assert.Equal(File.ReadAllText(Path.Combine(fixtures, "sample-api.postman_collection.json")).Replace("\r\n", "\n"), File.ReadAllText(collection));
+    }
+
+    [Fact]
+    public void Snapshot_must_not_be_written_inside_the_api_or_over_another_output()
+    {
+        var api = InWork("api");
+        Directory.CreateDirectory(api);
+        File.WriteAllText(Path.Combine(api, "C.cs"), "[Route(\"x\")] public class XController : ControllerBase { [HttpGet] public object G() => 1; }");
+
+        var inside = Run("generate", api, "--snapshot", Path.Combine(api, "snapshot.json"));
+        Assert.Equal(CliApplication.Failure, inside.Code);
+        Assert.Contains("Refusing to write --snapshot", inside.Err);
+
+        var same = InWork("same.json");
+        var clash = Run("generate", api, "--out", same, "--snapshot", same);
+        Assert.Equal(CliApplication.Failure, clash.Code);
+        Assert.Contains("--out and --snapshot must be different files", clash.Err);
+        Assert.False(File.Exists(same));
+    }
+
+    [Fact]
+    public void Duplicate_endpoint_identities_fail_the_run_before_any_file_is_written()
+    {
+        var api = InWork("dup-api");
+        Directory.CreateDirectory(api);
+        File.WriteAllText(Path.Combine(api, "C.cs"), """
+            [Route("api/x")]
+            public class XController : ControllerBase
+            {
+                [HttpGet("{id:int}")] public object ById(int id) => 1;
+                [HttpGet("{count:int}")] public object ByCount(int count) => 1;
+            }
+            """);
+        var collection = InWork("dup-collection.json");
+        var snapshot = InWork("dup-snapshot.json");
+
+        var (code, _, error) = Run("generate", api, "--out", collection, "--snapshot", snapshot);
+
+        Assert.Equal(CliApplication.Failure, code);
+        Assert.Contains("Cannot create the snapshot", error);
+        Assert.Contains("GET /api/x/{:int}", error);
+        Assert.False(File.Exists(collection));
+        Assert.False(File.Exists(snapshot));
+    }
 }

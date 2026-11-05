@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "identityVersion": 1,
+  "collection": {
+    "fileName": "sample-api.postman_collection.json",
+    "sha256": "a9e3c999e3875965f6e61871e9537be1344d81257422c710513cd8d5bbcc8190"
+  },
+  "endpoints": [
+    {
+      "id": "DELETE /api/customers/{:int}",
+      "fingerprint": "a1ac852c9121cb0771af11bbfb42807a565286529346180c1efdac33913767f9",
+      "httpMethod": "DELETE",
+      "route": "api/Customers/{id:int}",
+      "controllerName": "Customers",
+      "actionName": "Delete"
+    },
+    {
+      "id": "DELETE /api/orders/{:int}",
+      "fingerprint": "6df9b138b1d9e6d38459a8b47729c13190a33ca4953df47ac88f1df91a3aebc2",
+      "httpMethod": "DELETE",
+      "route": "api/Orders/{id:int}",
+      "controllerName": "Orders",
+      "actionName": "Delete"
+    },
+    {
+      "id": "DELETE /api/products/{:int}",
+      "fingerprint": "9982df0f2821181b767b44e166363155c62d8ce868a10e0779a26543df834fb3",
+      "httpMethod": "DELETE",
+      "route": "api/Products/{id:int}",
+      "controllerName": "Products",
+      "actionName": "Delete"
+    },
+    {
+      "id": "GET /api/customers",
+      "fingerprint": "4f58dd4d2fdac486533b1eae48659c85e06a984ae6c76ba7a2890f6238908f97",
+      "httpMethod": "GET",
+      "route": "api/Customers",
+      "controllerName": "Customers",
+      "actionName": "GetAll"
+    },
+    {
+      "id": "GET /api/customers/{:int}",
+      "fingerprint": "ad521aa7dcf46860550ad4e09d395ff58f18453ee15319402b39ac0dbe6f466f",
+      "httpMethod": "GET",
+      "route": "api/Customers/{id:int}",
+      "controllerName": "Customers",
+      "actionName": "GetById"
+    },
+    {
+      "id": "GET /api/orders",
+      "fingerprint": "6f90d90eead51de52dc62c1aef4957492d6b862c60c93f7e75bcfe09d86d66cf",
+      "httpMethod": "GET",
+      "route": "api/Orders",
+      "controllerName": "Orders",
+      "actionName": "GetAll"
+    },
+    {
+      "id": "GET /api/orders/{:int}",
+      "fingerprint": "20528b63a57ac2b338b0684322ad43cad87e612dc0b94e9aa0a0a99317156ac0",
+      "httpMethod": "GET",
+      "route": "api/Orders/{id:int}",
+      "controllerName": "Orders",
+      "actionName": "GetById"
+    },
+    {
+      "id": "GET /api/products",
+      "fingerprint": "2ac1af357a630cbd566ddc297c6bccf466226f3c99c0ba6db10a65f786eb74bb",
+      "httpMethod": "GET",
+      "route": "api/Products",
+      "controllerName": "Products",
+      "actionName": "GetAll"
+    },
+    {
+      "id": "GET /api/products/{:int}",
+      "fingerprint": "bd961f7b88bc6b08dcf7796ab3b7d98972e9ffdee1eb76a761c0cf4d9f191034",
+      "httpMethod": "GET",
+      "route": "api/Products/{id:int}",
+      "controllerName": "Products",
+      "actionName": "GetById"
+    },
+    {
+      "id": "POST /api/customers",
+      "fingerprint": "c2c50d4df42eb6095fc6698ebcb14dcae49eb68892659a0b7ca2d200eaf58211",
+      "httpMethod": "POST",
+      "route": "api/Customers",
+      "controllerName": "Customers",
+      "actionName": "Create"
+    },
+    {
+      "id": "POST /api/orders",
+      "fingerprint": "b2da5084744dc1acccaa054d5ac3c97ee89be6f8ed0d338bcea27a4aaf03eb52",
+      "httpMethod": "POST",
+      "route": "api/Orders",
+      "controllerName": "Orders",
+      "actionName": "Create"
+    },
+    {
+      "id": "POST /api/products",
+      "fingerprint": "ef0b77720fc113a8a2ed9855f045f001c1f0b0d5f3d6b3bfae4bb41b7efacc1b",
+      "httpMethod": "POST",
+      "route": "api/Products",
+      "controllerName": "Products",
+      "actionName": "Create"
+    },
+    {
+      "id": "PUT /api/customers/{:int}",
+      "fingerprint": "48417ad761ae30e66f11bcdbdd5a87d6da7c90dad9ca9f3718ab6b0001853526",
+      "httpMethod": "PUT",
+      "route": "api/Customers/{id:int}",
+      "controllerName": "Customers",
+      "actionName": "Update"
+    },
+    {
+      "id": "PUT /api/orders/{:int}",
+      "fingerprint": "9b0202cb28e4ddc014f42e95fe4145d4513ba55d7daf9474869589c411e252d9",
+      "httpMethod": "PUT",
+      "route": "api/Orders/{id:int}",
+      "controllerName": "Orders",
+      "actionName": "Update"
+    },
+    {
+      "id": "PUT /api/products/{:int}",
+      "fingerprint": "4af1238524369c44e49d2076c839ab8d9296336501338546d50d65a665955481",
+      "httpMethod": "PUT",
+      "route": "api/Products/{id:int}",
+      "controllerName": "Products",
+      "actionName": "Update"
+    }
+  ]
+}

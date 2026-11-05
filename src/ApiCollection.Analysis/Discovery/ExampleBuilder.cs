@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using ApiCollection.Core.Identity;
 using ApiCollection.Core.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -25,6 +26,22 @@ internal sealed class ExampleBuilder(
         ["CreatedAtRoute"] = 201
     };
 
+    // Metadata endpoint keys may be written in any readable form ("get api/Products/{id:int}"); they are matched by canonical identity.
+    private readonly Dictionary<string, (string Key, string Value)> _requestExamples = IndexByIdentity(metadata?.RequestExamples);
+
+    private readonly Dictionary<string, (string Key, IReadOnlyDictionary<int, string> Value)> _responseExamples = IndexByIdentity(metadata?.ResponseExamples);
+
+    private static Dictionary<string, (string Key, T Value)> IndexByIdentity<T>(IReadOnlyDictionary<string, T>? source)
+    {
+        var index = new Dictionary<string, (string Key, T Value)>(StringComparer.Ordinal);
+        foreach (var (key, value) in source ?? new Dictionary<string, T>())
+        {
+            index[EndpointIdentity.Canonicalize(key)] = (key, value);
+        }
+
+        return index;
+    }
+
     // ---- request examples ----
 
     public ExampleDefinition? BuildRequestExample(string endpointId, RequestBodyDefinition body)
@@ -32,9 +49,10 @@ internal sealed class ExampleBuilder(
         var bodyType = SyntaxFactory.ParseTypeName(body.TypeName);
         var typeName = LastIdentifier(ElementType(bodyType));
 
-        if (metadata is not null && metadata.RequestExamples.TryGetValue(endpointId, out var raw))
+        if (metadata is not null && _requestExamples.TryGetValue(endpointId, out var requestEntry))
         {
-            var detail = $"{metadata.SourceName}: requests[{endpointId}]";
+            var raw = requestEntry.Value;
+            var detail = $"{metadata.SourceName}: requests[{requestEntry.Key}]";
             var errors = new List<string>();
             if (!ExampleJson.TryParse(raw, out var node))
             {
@@ -198,11 +216,11 @@ internal sealed class ExampleBuilder(
     {
         var responses = new List<ResponseDefinition>();
 
-        if (metadata is not null && metadata.ResponseExamples.TryGetValue(endpointId, out var byStatus))
+        if (metadata is not null && _responseExamples.TryGetValue(endpointId, out var responseEntry))
         {
-            foreach (var (status, raw) in byStatus.OrderBy(e => e.Key))
+            foreach (var (status, raw) in responseEntry.Value.OrderBy(e => e.Key))
             {
-                var detail = $"{metadata.SourceName}: responses[{endpointId}][{status}]";
+                var detail = $"{metadata.SourceName}: responses[{responseEntry.Key}][{status}]";
                 if (!ExampleJson.TryParse(raw, out var node))
                 {
                     diagnostics.Add(new ExampleDiagnostic("EX003", endpointId, status.ToString(), $"{detail} was rejected: not valid JSON"));
@@ -658,12 +676,12 @@ internal sealed class ExampleBuilder(
         }
 
         var ids = endpoints.Select(e => e.Id).ToHashSet();
-        foreach (var id in metadata.RequestExamples.Keys.Where(k => !ids.Contains(k)))
+        foreach (var id in metadata.RequestExamples.Keys.Where(k => !ids.Contains(EndpointIdentity.Canonicalize(k))))
         {
             diagnostics.Add(new ExampleDiagnostic("EX005", id, "requests", $"{metadata.SourceName}: requests['{id}'] matches no discovered endpoint."));
         }
 
-        foreach (var id in metadata.ResponseExamples.Keys.Where(k => !ids.Contains(k)))
+        foreach (var id in metadata.ResponseExamples.Keys.Where(k => !ids.Contains(EndpointIdentity.Canonicalize(k))))
         {
             diagnostics.Add(new ExampleDiagnostic("EX005", id, "responses", $"{metadata.SourceName}: responses['{id}'] matches no discovered endpoint."));
         }

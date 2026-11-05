@@ -261,11 +261,11 @@ public sealed class ExampleExtractionTests
         }
 
         var messages = result.ExampleDiagnostics.Where(d => d.Code == "EX004").ToDictionary(d => d.Endpoint!, d => d.Message);
-        Assert.Contains("'p' is not a static literal", messages["GET api/Ping/var"]);
-        Assert.Contains("Count: not assigned and has no literal default", messages["GET api/Ping/partial"]);
-        Assert.Contains("Name: expected a string", messages["GET api/Ping/wrong"]);
-        Assert.Contains("not a static literal", messages["GET api/Ping/cond"]);
-        Assert.DoesNotContain("DELETE api/Ping/{id}", messages.Keys);
+        Assert.Contains("'p' is not a static literal", messages["GET /api/ping/var"]);
+        Assert.Contains("Count: not assigned and has no literal default", messages["GET /api/ping/partial"]);
+        Assert.Contains("Name: expected a string", messages["GET /api/ping/wrong"]);
+        Assert.Contains("not a static literal", messages["GET /api/ping/cond"]);
+        Assert.DoesNotContain("DELETE /api/ping/{}", messages.Keys);
     }
 
     [Fact]
@@ -282,7 +282,7 @@ public sealed class ExampleExtractionTests
         var variable = Single(result, "Var").Responses;
         Assert.Equal([200, 404], variable.Select(r => r.StatusCode));
         Assert.All(variable, r => Assert.Equal(ExampleSource.ExternalMetadata, Assert.Single(r.Example!.Fields).Source));
-        Assert.DoesNotContain(result.ExampleDiagnostics, d => d.Endpoint == "GET api/Ping/var");
+        Assert.DoesNotContain(result.ExampleDiagnostics, d => d.Endpoint == "GET /api/ping/var");
 
         var one = Assert.Single(Single(result, "One").Responses);
         Assert.Equal("""{"id":100}""", Compact(one.Example!.Json));

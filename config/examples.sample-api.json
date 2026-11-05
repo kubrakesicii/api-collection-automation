@@ -1,6 +1,7 @@
 {
   // Curated example values for sample-api. Fictional data only: never put secrets or real customer data here.
-  // Sections: "properties" (Type.Property), "requests" and "responses" (endpoint Id, e.g. "POST api/Products").
+  // Sections: "properties" (Type.Property), "requests" and "responses" (keyed by endpoint, e.g. "POST api/Products").
+  // Endpoint keys are matched by canonical identity, so method case, route case and parameter names do not matter.
   "properties": {
     "CreateProductRequest.Name": "Laptop",
     "CreateProductRequest.Price": 1299.9,
