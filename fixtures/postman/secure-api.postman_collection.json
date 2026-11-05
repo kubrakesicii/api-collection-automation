@@ -1,0 +1,215 @@
+{
+  "info": {
+    "name": "Secure API Fixture",
+    "description": "Generated from endpoint metadata. Set the `baseUrl` variable and, for protected endpoints, the `token` variable.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Accounts",
+      "item": [
+        {
+          "name": "List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Accounts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "int, optional, default 1",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "string?, optional, default null",
+                  "disabled": true
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "**GET** `/api/Accounts`\n\nController: `Accounts` · Action: `List`\n\nAuthentication: **required**.\nUses the Bearer token from the `{{token}}` variable.\n\nParameters:\n- `page` (query): int, optional, default 1\n- `search` (query): string?, optional, default null"
+          },
+          "response": []
+        },
+        {
+          "name": "Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/Accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Ada Example\",\n  \"email\": \"ada@example.com\",\n  \"address\": {\n    \"city\": \"Berlin\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "**POST** `/api/Accounts`\n\nController: `Accounts` · Action: `Create`\n\nAuthentication: **required**.\nUses the Bearer token from the `{{token}}` variable.\n\nBody example (incomplete); sources:\n- `DisplayName`: XmlDocExample (DTOs/AccountDtos.cs:5: CreateAccountRequest.DisplayName)\n- `Email`: XmlDocExample (DTOs/AccountDtos.cs:8: CreateAccountRequest.Email)\n- `Address.City`: XmlDocExample (DTOs/AccountDtos.cs:16: AddressDto.City)\nFields without an example (omitted): `Address.Street`."
+          },
+          "response": []
+        },
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Accounts/ping",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Accounts",
+                "ping"
+              ]
+            },
+            "description": "**GET** `/api/Accounts/ping`\n\nController: `Accounts` · Action: `Ping`"
+          },
+          "response": []
+        },
+        {
+          "name": "Get",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "",
+                "type": "text",
+                "description": "string?, optional",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/Accounts/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Accounts",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "Guid, required"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "**GET** `/api/Accounts/{id:guid}`\n\nController: `Accounts` · Action: `Get`\n\nAuthentication: **required**.\nUses the Bearer token from the `{{token}}` variable.\n\nParameters:\n- `id` (path): Guid, required\n- `X-Correlation-Id` (header): string?, optional"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Accounts/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Accounts",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "Guid, required"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "**DELETE** `/api/Accounts/{id:guid}`\n\nController: `Accounts` · Action: `Delete`\n\nAuthentication: **required** (roles: Admin).\nUses the Bearer token from the `{{token}}` variable.\n\nParameters:\n- `id` (path): Guid, required"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "description": "Base address of the API."
+    },
+    {
+      "key": "token",
+      "value": "",
+      "description": "Bearer token for protected endpoints. Never commit a real token."
+    }
+  ]
+}

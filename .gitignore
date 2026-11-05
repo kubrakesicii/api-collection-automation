@@ -5,6 +5,9 @@ artifacts/
 *.nupkg
 *.snupkg
 
+# Node tooling (tests/postman-import); package-lock.json stays tracked
+node_modules/
+
 # IDE and user-specific settings
 .vs/
 .vscode/

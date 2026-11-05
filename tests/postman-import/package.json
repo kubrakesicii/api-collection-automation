@@ -1,0 +1,14 @@
+{
+  "name": "api-collection-postman-import-check",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Loads generated collections with Postman's own collection SDK and runs them with Newman. Test tooling only.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "newman": "6.2.3",
+    "postman-collection": "5.3.1"
+  }
+}

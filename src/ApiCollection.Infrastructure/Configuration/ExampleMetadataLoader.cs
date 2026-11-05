@@ -18,7 +18,8 @@ public static class ExampleMetadataLoader
 {
     private static readonly JsonDocumentOptions Options = new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip };
 
-    public static ExampleMetadata Load(string path) => Parse(File.ReadAllText(path), path);
+    /// <summary>Loads a file. Only the file name is kept as the source name so generated output never embeds machine-specific paths.</summary>
+    public static ExampleMetadata Load(string path) => Parse(File.ReadAllText(path), Path.GetFileName(path));
 
     public static ExampleMetadata Parse(string json, string sourceName)
     {
