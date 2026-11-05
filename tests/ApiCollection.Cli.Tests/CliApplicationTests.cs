@@ -283,7 +283,7 @@ public sealed class CliApplicationTests : IDisposable
 
         using var json = JsonDocument.Parse(File.ReadAllText(snapshot));
         var root = json.RootElement;
-        Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(2, root.GetProperty("schemaVersion").GetInt32());
         Assert.Equal(15, root.GetProperty("endpoints").GetArrayLength());
         Assert.Equal("sample.postman_collection.json", root.GetProperty("collection").GetProperty("fileName").GetString());
         var expectedHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(collection))).ToLowerInvariant();
@@ -333,6 +333,227 @@ public sealed class CliApplicationTests : IDisposable
         Assert.Equal(CliApplication.Failure, clash.Code);
         Assert.Contains("--out and --snapshot must be different files", clash.Err);
         Assert.False(File.Exists(same));
+    }
+
+    // ---- diff ----
+
+    private const string ItemsApi = """
+        [ApiController]
+        [Route("api/[controller]")]
+        public class ItemsController : ControllerBase
+        {
+            [HttpGet] public IActionResult List() => Ok();
+            [HttpGet("{id:int}")] public IActionResult Get(int id) => Ok();
+            [HttpGet("ping")] public IActionResult Ping() => Ok();
+            [HttpPost] public IActionResult Create(CreateItem request) => Ok();
+            [HttpDelete("{id:int}")] public IActionResult Delete(int id) => NoContent();
+        }
+        public class CreateItem { public string Name { get; set; } = ""; }
+        """;
+
+    private const string EvolvedItemsApi = """
+        [ApiController]
+        [Route("api/[controller]")]
+        public class ItemsController : ControllerBase
+        {
+            [Authorize] [HttpGet] public IActionResult List() => Ok();
+            [HttpGet("{id:int}")] public IActionResult Get(int id, string? expand) => Ok();
+            [HttpGet("ping")] public IActionResult Ping() => Ok();
+            [HttpGet("count")] public IActionResult Count() => Ok();
+            [HttpPost] public IActionResult Create(CreateItem request) => Ok();
+        }
+        public class CreateItem { public string Name { get; set; } = ""; public decimal Price { get; set; } }
+        """;
+
+    private string WriteApi(string name, string source)
+    {
+        var api = InWork(name);
+        Directory.CreateDirectory(api);
+        File.WriteAllText(Path.Combine(api, "Items.cs"), source);
+        return api;
+    }
+
+    /// <summary>Creates a baseline (collection + snapshot) for the given API in its own folder and returns the snapshot path.</summary>
+    private string Baseline(string api)
+    {
+        var folder = InWork("baseline-" + Path.GetFileName(api));
+        var snapshot = Path.Combine(folder, "api.snapshot.json");
+        Assert.Equal(0, Run("generate", api, "--out", Path.Combine(folder, "api.postman_collection.json"), "--snapshot", snapshot).Code);
+        return snapshot;
+    }
+
+    [Fact]
+    public void Diff_of_an_unchanged_api_reports_no_changes_and_exit_code_stays_zero()
+    {
+        var baseline = Path.Combine(RepositoryRoot(), "fixtures", "postman", "sample-api.snapshot.json");
+
+        var (code, output, error) = Run("diff", SampleApi, "--baseline", baseline, "--examples", Examples, "--exit-code");
+
+        Assert.Equal(CliApplication.Success, code);
+        Assert.Contains("Summary: 0 added, 0 modified, 0 removed, 15 unchanged", output);
+        Assert.Contains("No changes.", output);
+        Assert.DoesNotContain("Warnings", output);
+        Assert.DoesNotContain("Added (", output);
+        Assert.Equal("", error);
+    }
+
+    [Fact]
+    public void Diff_reports_added_modified_removed_and_unchanged_endpoints_and_writes_both_outputs()
+    {
+        var baseline = Baseline(WriteApi("items-v1", ItemsApi));
+        var evolved = WriteApi("items-v2", EvolvedItemsApi);
+        var changes = InWork("out/changes.json");
+        var report = InWork("out/diff.txt");
+
+        var (code, output, error) = Run("diff", evolved, "--baseline", baseline, "--changes", changes, "--report", report, "--exit-code");
+
+        Assert.Equal(CliApplication.ChangesDetected, code);
+        Assert.Contains("Summary: 1 added, 3 modified, 1 removed, 1 unchanged", output);
+        Assert.Contains("Added (1)", output);
+        Assert.Contains("  + GET /api/items/count   Items.Count", output);
+        Assert.Contains("Modified (3)", output);
+        Assert.Contains("  ~ GET /api/items/{:int}   Items.Get", output);
+        Assert.Contains("Parameter      Added    parameter[query:expand]: required=false; type=string?", output);
+        Assert.Contains("Authentication Changed  auth.required: false -> true", output);
+        Assert.Contains("body.property[Price]", output);
+        Assert.Contains("Removed (1)", output);
+        Assert.Contains("  - DELETE /api/items/{:int}   Items.Delete", output);
+        Assert.Contains("Unchanged (1)", output);
+        Assert.Contains("  = GET /api/items/ping   Items.Ping", output);
+        Assert.Contains($"Wrote report {report}", error);
+        Assert.Contains($"Wrote change set {changes}", error);
+
+        Assert.Equal(output, File.ReadAllText(report));
+        using var json = JsonDocument.Parse(File.ReadAllText(changes));
+        var root = json.RootElement;
+        Assert.True(root.GetProperty("hasChanges").GetBoolean());
+        Assert.Equal(1, root.GetProperty("summary").GetProperty("added").GetInt32());
+        Assert.Equal(3, root.GetProperty("summary").GetProperty("modified").GetInt32());
+        Assert.Equal(1, root.GetProperty("summary").GetProperty("removed").GetInt32());
+        Assert.Equal(1, root.GetProperty("summary").GetProperty("unchanged").GetInt32());
+        var statuses = root.GetProperty("endpoints").EnumerateArray().ToDictionary(
+            e => e.GetProperty("actionName").GetString()!, e => e.GetProperty("status").GetString());
+        Assert.Equal("Added", statuses["Count"]);
+        Assert.Equal("Removed", statuses["Delete"]);
+        Assert.Equal("Unchanged", statuses["Ping"]);
+        Assert.Equal("Modified", statuses["List"]);
+    }
+
+    [Fact]
+    public void Diff_without_exit_code_succeeds_even_when_there_are_changes()
+    {
+        var baseline = Baseline(WriteApi("items-v1", ItemsApi));
+
+        var (code, output, _) = Run("diff", WriteApi("items-v2", EvolvedItemsApi), "--baseline", baseline);
+
+        Assert.Equal(CliApplication.Success, code);
+        Assert.Contains("1 added, 3 modified, 1 removed", output);
+    }
+
+    [Fact]
+    public void Diff_output_is_identical_across_runs()
+    {
+        var baseline = Baseline(WriteApi("items-v1", ItemsApi));
+        var evolved = WriteApi("items-v2", EvolvedItemsApi);
+
+        var first = Run("diff", evolved, "--baseline", baseline, "--changes", InWork("c1.json"));
+        var second = Run("diff", evolved, "--baseline", baseline, "--changes", InWork("c2.json"));
+
+        Assert.Equal(first.Out, second.Out);
+        Assert.Equal(File.ReadAllText(InWork("c1.json")), File.ReadAllText(InWork("c2.json")));
+    }
+
+    [Fact]
+    public void Diff_never_overwrites_the_baseline_and_keeps_its_outputs_out_of_the_api()
+    {
+        var api = WriteApi("items-v1", ItemsApi);
+        var baseline = Baseline(api);
+        var before = File.ReadAllText(baseline);
+
+        var overwrite = Run("diff", api, "--baseline", baseline, "--changes", baseline);
+        Assert.Equal(CliApplication.Failure, overwrite.Code);
+        Assert.Contains("--changes and --baseline must be different files", overwrite.Err);
+        Assert.Equal(before, File.ReadAllText(baseline));
+
+        var inside = Run("diff", api, "--baseline", baseline, "--report", Path.Combine(api, "diff.txt"));
+        Assert.Equal(CliApplication.Failure, inside.Code);
+        Assert.Contains("Refusing to write --report", inside.Err);
+        Assert.False(File.Exists(Path.Combine(api, "diff.txt")));
+    }
+
+    [Fact]
+    public void Diff_fails_clearly_for_a_missing_corrupt_edited_or_incompatible_baseline()
+    {
+        var api = WriteApi("items-v1", ItemsApi);
+
+        var missing = Run("diff", api, "--baseline", InWork("nope.json"));
+        Assert.Equal(CliApplication.Failure, missing.Code);
+        Assert.Contains("Cannot read the baseline snapshot", missing.Err);
+
+        var corrupt = InWork("corrupt.json");
+        File.WriteAllText(corrupt, "{ not json");
+        Assert.Contains("not a valid snapshot", Run("diff", api, "--baseline", corrupt).Err);
+
+        var good = Baseline(api);
+        var edited = InWork("edited.json");
+        File.WriteAllText(edited, File.ReadAllText(good).Replace("\"endpoint.action\": \"List\"", "\"endpoint.action\": \"Hacked\""));
+        var tampered = Run("diff", api, "--baseline", edited);
+        Assert.Equal(CliApplication.Failure, tampered.Code);
+        Assert.Contains("does not match its contract", tampered.Err);
+
+        var incompatible = InWork("old-rules.json");
+        File.WriteAllText(incompatible, File.ReadAllText(good).Replace("\"identityVersion\": 1", "\"identityVersion\": 0"));
+        var versions = Run("diff", api, "--baseline", incompatible);
+        Assert.Equal(CliApplication.Failure, versions.Code);
+        Assert.Contains("new baseline", versions.Err);
+    }
+
+    [Fact]
+    public void Diff_warns_when_the_baseline_collection_was_changed_or_is_missing()
+    {
+        var api = WriteApi("items-v1", ItemsApi);
+        var baseline = Baseline(api);
+        var collection = Path.Combine(Path.GetDirectoryName(baseline)!, "api.postman_collection.json");
+
+        File.AppendAllText(collection, " ");
+        var changed = Run("diff", api, "--baseline", baseline);
+        Assert.Equal(CliApplication.Success, changed.Code);
+        Assert.Contains("differs from the one the snapshot was taken with", changed.Out);
+        Assert.Contains("No changes.", changed.Out);
+
+        File.Delete(collection);
+        var missing = Run("diff", api, "--baseline", baseline);
+        Assert.Contains("was not found next to the snapshot", missing.Out);
+    }
+
+    [Fact]
+    public void Diff_carries_discovery_warnings_so_a_removal_can_be_distrusted()
+    {
+        var api = WriteApi("items-v1", ItemsApi);
+        var baseline = Baseline(api);
+        File.WriteAllText(Path.Combine(api, "Items.cs"), ItemsApi.Replace("""[Route("api/[controller]")]""", "[Route(Routes.Base)]"));
+
+        var (_, output, _) = Run("diff", api, "--baseline", baseline);
+
+        Assert.Contains("Summary: 0 added, 0 modified, 5 removed, 0 unchanged", output);
+        Assert.Contains("WARN Discovery: ItemsController: route template is not a string literal", output);
+    }
+
+    [Theory]
+    [InlineData("diff", "{dir}")]
+    [InlineData("diff", "{dir}", "--out", "x.json")]
+    [InlineData("diff", "{dir}", "--baseline")]
+    [InlineData("diff", "{dir}", "--baseline", "a.json", "--strict")]
+    [InlineData("diff", "{dir}", "--baseline", "a.json", "--exit-code", "--exit-code")]
+    [InlineData("generate", "{dir}", "--exit-code")]
+    [InlineData("generate", "{dir}", "--baseline", "a.json")]
+    public void Diff_and_generate_reject_options_that_belong_to_the_other_command(params string[] args)
+    {
+        var (code, output, error) = Run(args.Select(a => a == "{dir}" ? SampleApi : a).ToArray());
+
+        Assert.Equal(CliApplication.Failure, code);
+        Assert.Contains("Usage:", error);
+        Assert.Equal("", output);
     }
 
     [Fact]

@@ -5,81 +5,26 @@ using ApiCollection.Core.Models;
 namespace ApiCollection.Core.Snapshots;
 
 /// <summary>
-/// A hash over everything about an endpoint that ends up in the generated collection, used to tell "Unchanged" from "Modified".
-/// Where an example came from (file names, line numbers) is deliberately excluded: moving or reformatting code must not
-/// make an endpoint look modified. The example values themselves are included.
+/// A SHA-256 over an endpoint's <see cref="EndpointContract"/> facts, used to tell "Unchanged" from "Modified" without
+/// comparing every fact. Because it is derived from the facts, moving or reformatting code (which never changes a fact)
+/// never changes the fingerprint.
 /// </summary>
 public static class EndpointFingerprint
 {
-    public static string Compute(EndpointDefinition endpoint)
+    public static string Compute(EndpointDefinition endpoint) => FromContract(EndpointContract.From(endpoint));
+
+    public static string FromContract(IReadOnlyDictionary<string, string> contract)
     {
         var text = new StringBuilder();
-
-        void Line(string kind, params string?[] parts)
+        foreach (var (key, value) in contract.OrderBy(fact => fact.Key, StringComparer.Ordinal))
         {
-            text.Append(kind);
-            foreach (var part in parts)
-            {
-                text.Append('|').Append(Escape(part));
-            }
-
-            text.Append('\n');
-        }
-
-        Line("endpoint", endpoint.Id, endpoint.ControllerName, endpoint.ActionName, endpoint.HttpMethod.ToString(), endpoint.RouteTemplate);
-
-        foreach (var parameter in endpoint.Parameters)
-        {
-            Line("param", parameter.Name, parameter.Location.ToString(), parameter.TypeName, Flag(parameter.IsRequired), parameter.DefaultValue);
-        }
-
-        if (endpoint.RequestBody is { } body)
-        {
-            Line("body", body.TypeName, body.ContentType, Flag(body.IsRequired));
-            Properties(body.Properties, 0);
-            Example("bodyExample", body.Example);
-        }
-
-        foreach (var response in endpoint.Responses)
-        {
-            Line("response", response.StatusCode.ToString(), response.TypeName, response.ContentType);
-            Example("responseExample", response.Example);
-        }
-
-        var auth = endpoint.Authentication;
-        Line("auth", Flag(auth.RequiresAuthentication), auth.Scheme, string.Join(',', auth.Roles), string.Join(',', auth.Policies));
-
-        foreach (var rule in endpoint.Validation)
-        {
-            Line("rule", rule.PropertyName, rule.RuleName, string.Join(',', rule.Arguments));
+            text.Append(Escape(key)).Append('=').Append(Escape(value)).Append('\n');
         }
 
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString()))).ToLowerInvariant();
-
-        void Properties(IReadOnlyList<PropertyDefinition> properties, int depth)
-        {
-            foreach (var property in properties)
-            {
-                Line(
-                    "prop", depth.ToString(), property.Name, property.TypeName, Flag(property.IsRequired), Flag(property.IsNullable),
-                    property.JsonName, property.Example?.Json, property.DefaultValue?.Json);
-                Properties(property.Properties, depth + 1);
-            }
-        }
-
-        void Example(string kind, ExampleDefinition? example)
-        {
-            if (example is not null)
-            {
-                Line(kind, example.Json.Replace("\r\n", "\n", StringComparison.Ordinal), Flag(example.IsComplete), string.Join(',', example.MissingFields));
-            }
-        }
     }
 
-    private static string Flag(bool value) => value ? "1" : "0";
-
-    private static string Escape(string? value) => value is null
-        ? "\\0"
-        : value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("|", "\\|", StringComparison.Ordinal)
-               .Replace("\r", string.Empty, StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal);
+    private static string Escape(string value) =>
+        value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("=", "\\=", StringComparison.Ordinal)
+             .Replace("\r", string.Empty, StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal);
 }

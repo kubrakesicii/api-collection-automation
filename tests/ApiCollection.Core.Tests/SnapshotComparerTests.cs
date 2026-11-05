@@ -134,7 +134,7 @@ public sealed class SnapshotComparerTests
         Assert.Contains("identity rules 99/1", identity.Message);
         Assert.Contains("new baseline", identity.Message);
 
-        var schema = Assert.Throws<InvalidOperationException>(() => SnapshotComparer.Compare(current, current with { SchemaVersion = 2 }));
-        Assert.Contains("schema 1/2", schema.Message);
+        var schema = Assert.Throws<InvalidOperationException>(() => SnapshotComparer.Compare(current, current with { SchemaVersion = 99 }));
+        Assert.Contains($"schema {current.SchemaVersion}/99", schema.Message);
     }
 }

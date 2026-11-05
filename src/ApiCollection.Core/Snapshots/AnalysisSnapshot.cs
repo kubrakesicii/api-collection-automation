@@ -12,7 +12,8 @@ namespace ApiCollection.Core.Snapshots;
 /// </summary>
 public sealed record AnalysisSnapshot
 {
-    public const int CurrentSchemaVersion = 1;
+    /// <summary>2: endpoints carry their contract facts so a later run can say what changed, not only that something did.</summary>
+    public const int CurrentSchemaVersion = 2;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
@@ -29,14 +30,19 @@ public sealed record AnalysisSnapshot
     public static AnalysisSnapshot Create(IEnumerable<EndpointDefinition> endpoints, SnapshotCollection? collection = null)
     {
         var entries = endpoints
-            .Select(e => new SnapshotEndpoint
+            .Select(e =>
             {
-                Id = e.Id,
-                Fingerprint = EndpointFingerprint.Compute(e),
-                HttpMethod = e.HttpMethod.ToString().ToUpperInvariant(),
-                Route = e.RouteTemplate,
-                ControllerName = e.ControllerName,
-                ActionName = e.ActionName
+                var contract = EndpointContract.From(e);
+                return new SnapshotEndpoint
+                {
+                    Id = e.Id,
+                    Fingerprint = EndpointFingerprint.FromContract(contract),
+                    HttpMethod = e.HttpMethod.ToString().ToUpperInvariant(),
+                    Route = e.RouteTemplate,
+                    ControllerName = e.ControllerName,
+                    ActionName = e.ActionName,
+                    Contract = contract
+                };
             })
             .OrderBy(e => e.Id, StringComparer.Ordinal)
             .ThenBy(e => e.ControllerName, StringComparer.Ordinal)
@@ -60,7 +66,7 @@ public sealed record SnapshotEndpoint
     /// <summary>Stable identity (see <see cref="EndpointIdentity"/>).</summary>
     public required string Id { get; init; }
 
-    /// <summary>Hash of the endpoint's content (see <see cref="EndpointFingerprint"/>).</summary>
+    /// <summary>Hash of <see cref="Contract"/> (see <see cref="EndpointFingerprint"/>); a stored file whose hash does not match was edited by hand.</summary>
     public required string Fingerprint { get; init; }
 
     public required string HttpMethod { get; init; }
@@ -71,6 +77,9 @@ public sealed record SnapshotEndpoint
     public required string ControllerName { get; init; }
 
     public required string ActionName { get; init; }
+
+    /// <summary>Everything about the endpoint's contract as plain facts (see <see cref="EndpointContract"/>); this is what a diff reads.</summary>
+    public required ContractFacts Contract { get; init; }
 }
 
 public sealed record SnapshotCollection

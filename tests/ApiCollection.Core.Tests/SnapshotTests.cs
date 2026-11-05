@@ -57,7 +57,7 @@ public sealed class SnapshotTests
 
     public static TheoryData<string> ContentChanges => new()
     {
-        "controller", "action", "route", "method", "parameter", "required", "body type", "property", "property example",
+        "controller", "action", "route", "parameter", "required", "body type", "property", "property example",
         "body example", "response", "auth role", "auth scheme", "validation argument", "extra validation"
     };
 
@@ -71,7 +71,6 @@ public sealed class SnapshotTests
             "controller" => Endpoint(controller: "Items"),
             "action" => Endpoint(action: "Fetch"),
             "route" => Endpoint(route: "api/Products/{id:guid}"),
-            "method" => Endpoint(method: HttpMethodKind.Put),
             "parameter" => Endpoint(change: e => e with { Parameters = [e.Parameters[0] with { TypeName = "long" }] }),
             "required" => Endpoint(change: e => e with { Parameters = [e.Parameters[0] with { IsRequired = false }] }),
             "body type" => Endpoint(change: e => e with { RequestBody = e.RequestBody! with { TypeName = "OtherDto" } }),
@@ -151,7 +150,7 @@ public sealed class SnapshotTests
 
         Assert.Equal(["GET /api/a", "GET /api/b", "POST /api/c"], first.Endpoints.Select(e => e.Id));
         Assert.Equal(first.Endpoints, second.Endpoints);
-        Assert.Equal((1, EndpointIdentity.Version), (first.SchemaVersion, first.IdentityVersion));
+        Assert.Equal((AnalysisSnapshot.CurrentSchemaVersion, EndpointIdentity.Version), (first.SchemaVersion, first.IdentityVersion));
     }
 
     [Fact]

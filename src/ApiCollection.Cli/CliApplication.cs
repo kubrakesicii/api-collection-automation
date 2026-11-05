@@ -1,4 +1,5 @@
 using ApiCollection.Analysis.Discovery;
+using ApiCollection.Core.Diff;
 using ApiCollection.Core.Models;
 using ApiCollection.Core.Snapshots;
 using ApiCollection.Infrastructure.Configuration;
@@ -14,8 +15,11 @@ public static class CliApplication
     public const int Success = 0;
     public const int Failure = 1;
 
-    /// <summary>Returned by <c>--strict</c> when discovery reported warnings (outputs are still written).</summary>
+    /// <summary>Returned by <c>generate --strict</c> when discovery reported warnings (outputs are still written).</summary>
     public const int StrictViolation = 2;
+
+    /// <summary>Returned by <c>diff --exit-code</c> when anything was added, modified or removed.</summary>
+    public const int ChangesDetected = 2;
 
     public const string Usage = """
         Usage:
@@ -23,22 +27,30 @@ public static class CliApplication
           ApiCollection.Cli generate <api-source-directory> [--examples <example-metadata.json>] [--name <collection-name>]
                                      [--base-url <url>] [--out <collection.json>] [--report <report.json|report.txt>]
                                      [--snapshot <snapshot.json>] [--strict]
+          ApiCollection.Cli diff <api-source-directory> --baseline <snapshot.json> [--examples <example-metadata.json>]
+                                 [--changes <changes.json>] [--report <diff.txt>] [--exit-code]
 
         'discover' prints the discovery report. 'generate' builds a Postman Collection v2.1 file locally; nothing is sent to Postman.
+        'diff' compares the current API with a baseline snapshot and prints what was added, modified, removed or unchanged.
         --out       write the collection to a file (otherwise it is printed to stdout)
-        --report    write the discovery report to a file: JSON for a .json extension, readable text otherwise
-        --snapshot  write the endpoint snapshot (identities, fingerprints, collection hash); an existing file is overwritten.
+        --report    generate: write the discovery report (JSON for a .json extension, readable text otherwise); diff: write the diff report
+        --snapshot  write the endpoint snapshot (identities, contract facts, collection hash); an existing file is overwritten.
                     Keep it next to the collection; it is the baseline later runs are compared against.
+        --baseline  the snapshot to compare with (read only; never overwritten)
+        --changes   write the machine-readable change set (JSON)
         --strict    exit with code 2 when discovery reported warnings (example diagnostics do not count); files are still written
+        --exit-code exit with code 2 when the diff found changes (like 'git diff --exit-code'); files are still written
         The API source is only read, never built or run, and output files may not be placed inside it.
         """;
 
     private static readonly string[] DiscoverOptions = ["--examples"];
     private static readonly string[] GenerateOptions = ["--examples", "--name", "--base-url", "--out", "--report", "--snapshot"];
+    private static readonly string[] DiffOptions = ["--examples", "--baseline", "--changes", "--report"];
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
-        if (!TryParse(args, out var command, out var directory, out var values, out var strict))
+        if (!TryParse(args, out var command, out var directory, out var values, out var flags)
+            || (command == "diff" && !values.ContainsKey("--baseline")))
         {
             error.WriteLine(Usage);
             return Failure;
@@ -50,7 +62,19 @@ public static class CliApplication
             return Failure;
         }
 
-        if (command == "generate" && !ValidateOutputs(directory, values, error))
+        var written = command switch
+        {
+            "generate" => new[] { "--out", "--report", "--snapshot" },
+            "diff" => ["--changes", "--report"],
+            _ => []
+        };
+        if (!ValidateOutputs(directory, values, written, error))
+        {
+            return Failure;
+        }
+
+        AnalysisSnapshot? baseline = null;
+        if (command == "diff" && !TryLoadBaseline(values["--baseline"], error, out baseline))
         {
             return Failure;
         }
@@ -71,14 +95,21 @@ public static class CliApplication
 
         var result = new EndpointDiscoveryEngine().DiscoverFromDirectory(directory, examples);
 
-        if (command == "discover")
+        return command switch
         {
-            output.Write(DiscoveryReportWriter.ToText(result));
-            return Success;
-        }
-
-        return Generate(result, values, strict, output, error);
+            "discover" => Discover(result, output),
+            "generate" => Generate(result, values, flags.Contains("--strict"), output, error),
+            _ => Diff(result, baseline!, values, flags.Contains("--exit-code"), output, error)
+        };
     }
+
+    private static int Discover(EndpointDiscoveryResult result, TextWriter output)
+    {
+        output.Write(DiscoveryReportWriter.ToText(result));
+        return Success;
+    }
+
+    // ---- generate ----
 
     private static int Generate(
         EndpointDiscoveryResult result, Dictionary<string, string> values, bool strict, TextWriter output, TextWriter error)
@@ -168,27 +199,128 @@ public static class CliApplication
         return Success;
     }
 
+    // ---- diff ----
+
+    private static bool TryLoadBaseline(string path, TextWriter error, out AnalysisSnapshot? baseline)
+    {
+        try
+        {
+            baseline = AnalysisSnapshotStore.Load(path);
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            error.WriteLine($"Cannot read the baseline snapshot: {exception.Message}");
+            baseline = null;
+            return false;
+        }
+    }
+
+    private static int Diff(
+        EndpointDiscoveryResult result, AnalysisSnapshot baseline, Dictionary<string, string> values, bool exitCode,
+        TextWriter output, TextWriter error)
+    {
+        AnalysisSnapshot current;
+        try
+        {
+            current = AnalysisSnapshot.Create(result.Endpoints);
+        }
+        catch (ArgumentException exception)
+        {
+            error.WriteLine($"Cannot compare: {exception.Message}");
+            return Failure;
+        }
+
+        // A removal may only be a failed discovery, and the baseline collection may have been edited after the snapshot:
+        // both are reported next to the result so a later policy (or a person) can decide how far to trust it.
+        var warnings = BaselineCollectionWarnings(baseline, values["--baseline"]).Concat(result.Warnings.Select(w => $"Discovery: {w}")).ToList();
+
+        ChangeSet changes;
+        try
+        {
+            changes = ChangeSetBuilder.Build(baseline, current, warnings);
+        }
+        catch (InvalidOperationException exception)
+        {
+            error.WriteLine(exception.Message);
+            return Failure;
+        }
+
+        var report = DiffReportWriter.ToText(changes);
+        output.Write(report);
+
+        if (values.TryGetValue("--report", out var reportPath))
+        {
+            if (!TryWrite(reportPath, report, error))
+            {
+                return Failure;
+            }
+
+            error.WriteLine($"Wrote report {reportPath}");
+        }
+
+        if (values.TryGetValue("--changes", out var changesPath))
+        {
+            if (!TryWrite(changesPath, ChangeSetSerializer.Serialize(changes), error))
+            {
+                return Failure;
+            }
+
+            error.WriteLine($"Wrote change set {changesPath}");
+        }
+
+        return exitCode && changes.HasChanges ? ChangesDetected : Success;
+    }
+
+    private static List<string> BaselineCollectionWarnings(AnalysisSnapshot baseline, string baselinePath)
+    {
+        if (baseline.Collection is null)
+        {
+            return ["The baseline snapshot does not reference a collection, so the baseline cannot be verified."];
+        }
+
+        var path = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(baselinePath)) ?? string.Empty, baseline.Collection.FileName);
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return [$"Baseline collection '{baseline.Collection.FileName}' was not found next to the snapshot, so the baseline cannot be verified."];
+            }
+
+            return SnapshotCollection.FromJson(path, File.ReadAllText(path)).Sha256 == baseline.Collection.Sha256
+                ? []
+                : [$"Baseline collection '{baseline.Collection.FileName}' differs from the one the snapshot was taken with; this diff describes the snapshot, not that file."];
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return [$"Baseline collection '{baseline.Collection.FileName}' could not be read ({exception.Message}), so the baseline cannot be verified."];
+        }
+    }
+
+    // ---- arguments ----
+
     private static bool TryParse(
-        string[] args, out string command, out string directory, out Dictionary<string, string> values, out bool strict)
+        string[] args, out string command, out string directory, out Dictionary<string, string> values, out HashSet<string> flags)
     {
         command = directory = string.Empty;
         values = [];
-        strict = false;
+        flags = [];
 
-        if (args.Length < 2 || args[0] is not ("discover" or "generate"))
+        if (args.Length < 2 || args[0] is not ("discover" or "generate" or "diff"))
         {
             return false;
         }
 
         command = args[0];
         directory = args[1];
-        var allowed = command == "discover" ? DiscoverOptions : GenerateOptions;
+        var allowed = command switch { "discover" => DiscoverOptions, "generate" => GenerateOptions, _ => DiffOptions };
+        var allowedFlag = command switch { "generate" => "--strict", "diff" => "--exit-code", _ => string.Empty };
 
         for (var i = 2; i < args.Length; i++)
         {
-            if (command == "generate" && args[i] == "--strict" && !strict)
+            if (args[i] == allowedFlag && !flags.Contains(allowedFlag))
             {
-                strict = true;
+                flags.Add(allowedFlag);
             }
             else if (allowed.Contains(args[i]) && i + 1 < args.Length && !values.ContainsKey(args[i]))
             {
@@ -203,17 +335,19 @@ public static class CliApplication
         return true;
     }
 
-    private static bool ValidateOutputs(string directory, Dictionary<string, string> values, TextWriter error)
+    /// <summary>Output files must differ from each other and from the baseline, and may not be placed inside the analyzed API.</summary>
+    private static bool ValidateOutputs(string directory, Dictionary<string, string> values, string[] outputOptions, TextWriter error)
     {
-        var outputs = new[] { "--out", "--report", "--snapshot" }.Where(values.ContainsKey).Select(option => (Option: option, Path: values[option])).ToList();
+        var outputs = outputOptions.Where(values.ContainsKey).Select(option => (Option: option, Path: values[option])).ToList();
+        var compared = values.ContainsKey("--baseline") ? [.. outputs, ("--baseline", values["--baseline"])] : outputs;
 
-        for (var i = 0; i < outputs.Count; i++)
+        for (var i = 0; i < compared.Count; i++)
         {
-            for (var j = i + 1; j < outputs.Count; j++)
+            for (var j = i + 1; j < compared.Count; j++)
             {
-                if (SamePath(outputs[i].Path, outputs[j].Path))
+                if (SamePath(compared[i].Path, compared[j].Path))
                 {
-                    error.WriteLine($"{outputs[i].Option} and {outputs[j].Option} must be different files.");
+                    error.WriteLine($"{compared[i].Item1} and {compared[j].Item1} must be different files.");
                     return false;
                 }
             }

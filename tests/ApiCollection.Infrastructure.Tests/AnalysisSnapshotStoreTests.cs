@@ -1,3 +1,4 @@
+using ApiCollection.Core.Diff;
 using ApiCollection.Core.Identity;
 using ApiCollection.Core.Models;
 using ApiCollection.Core.Snapshots;
@@ -43,7 +44,7 @@ public sealed class AnalysisSnapshotStoreTests : IDisposable
         Assert.StartsWith("{\n", text);
         Assert.EndsWith("}\n", text);
         Assert.DoesNotContain('\r', text);
-        Assert.Contains("\"schemaVersion\": 1", text);
+        Assert.Contains("\"schemaVersion\": 2", text);
         Assert.Contains("\"identityVersion\": 1", text);
         Assert.Contains("\"id\": \"GET /api/products/{:int}\"", text);
         Assert.Contains("\"fileName\": \"sample.postman_collection.json\"", text);
@@ -96,8 +97,8 @@ public sealed class AnalysisSnapshotStoreTests : IDisposable
     [Theory]
     [InlineData("{ not json", "not a valid snapshot")]
     [InlineData("null", "snapshot is empty")]
-    [InlineData("""{ "schemaVersion": 2, "identityVersion": 1, "endpoints": [] }""", "schema version 2 is not supported")]
-    [InlineData("""{ "schemaVersion": 1, "identityVersion": 1, "endpoints": [ { "id": "GET /a" } ] }""", "not a valid snapshot")]
+    [InlineData("""{ "schemaVersion": 3, "identityVersion": 1, "endpoints": [] }""", "schema version 3 is not supported")]
+    [InlineData("""{ "schemaVersion": 2, "identityVersion": 1, "endpoints": [ { "id": "GET /a" } ] }""", "not a valid snapshot")]
     public void Unreadable_or_unsupported_snapshots_are_rejected_with_a_clear_message(string json, string expected)
     {
         var exception = Assert.Throws<InvalidDataException>(() => AnalysisSnapshotStore.Deserialize(json, "baseline.json"));
@@ -109,8 +110,8 @@ public sealed class AnalysisSnapshotStoreTests : IDisposable
     [Fact]
     public void Duplicate_identities_in_a_file_are_rejected()
     {
-        const string entry = """{ "id": "GET /a", "fingerprint": "f", "httpMethod": "GET", "route": "a", "controllerName": "A", "actionName": "A" }""";
-        var json = $$"""{ "schemaVersion": 1, "identityVersion": 1, "endpoints": [ {{entry}}, {{entry}} ] }""";
+        const string entry = """{ "id": "GET /a", "fingerprint": "f", "httpMethod": "GET", "route": "a", "controllerName": "A", "actionName": "A", "contract": {} }""";
+        var json = $$"""{ "schemaVersion": 2, "identityVersion": 1, "endpoints": [ {{entry}}, {{entry}} ] }""";
 
         var exception = Assert.Throws<InvalidDataException>(() => AnalysisSnapshotStore.Deserialize(json, "dup.json"));
 
@@ -118,10 +119,65 @@ public sealed class AnalysisSnapshotStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_snapshot_whose_fingerprint_no_longer_matches_its_contract_is_rejected_as_edited()
+    {
+        var text = AnalysisSnapshotStore.Serialize(Sample());
+
+        var tampered = text.Replace("\"endpoint.action\": \"GetAll\"", "\"endpoint.action\": \"Hacked\"", StringComparison.Ordinal);
+        Assert.NotEqual(text, tampered);
+
+        var exception = Assert.Throws<InvalidDataException>(() => AnalysisSnapshotStore.Deserialize(tampered, "baseline.json"));
+
+        Assert.Contains("baseline.json", exception.Message);
+        Assert.Contains("does not match its contract", exception.Message);
+        Assert.Contains("GET /api/products", exception.Message);
+    }
+
+    [Fact]
+    public void Contract_facts_are_stored_sorted_and_survive_a_round_trip_by_value()
+    {
+        var snapshot = Sample();
+
+        var loaded = AnalysisSnapshotStore.Deserialize(AnalysisSnapshotStore.Serialize(snapshot), "s.json");
+
+        var getById = loaded.Endpoints.Single(e => e.ActionName == "GetById");
+        Assert.Equal(snapshot.Endpoints.Single(e => e.ActionName == "GetById").Contract, getById.Contract);
+        Assert.Equal(getById.Contract.Keys.OrderBy(k => k, StringComparer.Ordinal), getById.Contract.Keys);
+    }
+
+    [Fact]
+    public void Change_set_is_written_as_deterministic_camel_case_json_with_enum_names()
+    {
+        var before = AnalysisSnapshot.Create([Endpoint("GetAll", HttpMethodKind.Get, "api/Products")]);
+        var after = AnalysisSnapshot.Create(
+        [
+            Endpoint("GetAll", HttpMethodKind.Get, "api/Products") with { Authentication = new AuthenticationDefinition { RequiresAuthentication = true } },
+            Endpoint("Create", HttpMethodKind.Post, "api/Products")
+        ]);
+        var changes = ChangeSetBuilder.Build(before, after, ["a warning"]);
+
+        var text = ChangeSetSerializer.Serialize(changes);
+
+        Assert.Equal(text, ChangeSetSerializer.Serialize(changes));
+        Assert.DoesNotContain('\r', text);
+        Assert.EndsWith("}\n", text);
+        Assert.Contains("\"hasChanges\": true", text);
+        Assert.Contains("\"status\": \"Modified\"", text);
+        Assert.Contains("\"status\": \"Added\"", text);
+        Assert.Contains("\"category\": \"Authentication\"", text);
+        Assert.Contains("\"kind\": \"Changed\"", text);
+        Assert.Contains("\"path\": \"auth.required\"", text);
+        Assert.Contains("\"before\": \"false\"", text);
+        Assert.Contains("\"after\": \"true\"", text);
+        Assert.Contains("\"warnings\": [", text);
+        Assert.DoesNotContain("possibleRename", text);
+    }
+
+    [Fact]
     public void A_snapshot_from_other_identity_rules_loads_but_is_refused_by_the_comparer()
     {
         var old = AnalysisSnapshotStore.Deserialize(
-            """{ "schemaVersion": 1, "identityVersion": 0, "endpoints": [] }""", "old.json");
+            """{ "schemaVersion": 2, "identityVersion": 0, "endpoints": [] }""", "old.json");
 
         Assert.Equal(0, old.IdentityVersion);
         Assert.Throws<InvalidOperationException>(() => SnapshotComparer.Compare(old, Sample()));

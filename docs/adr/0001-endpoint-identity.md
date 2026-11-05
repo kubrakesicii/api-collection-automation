@@ -49,10 +49,12 @@ Constraint'ler kimliğin parçasıdır: `{id:int}` ve `{name}` aynı method'da a
 
 ## Karar: içerik parmak izi (fingerprint)
 
-`EndpointFingerprint` kimlik dışındaki, collection'a yansıyan her şeyin SHA-256 özetidir (controller/action adı, parametreler,
-body ve property'ler, response'lar, auth, validation, örnek değerler). Aynı kimlikte parmak izi farklıysa **Modified**.
-Örneğin **kaynağı** (dosya adı, satır numarası) parmak izine girmez: kodu taşımak veya araya satır eklemek endpoint'i
-"değişmiş" göstermemelidir. Örneğin **değeri** girer.
+`EndpointContract` bir endpoint'in collection'a yansıyan her şeyini sade `anahtar = değer` **olguları** olarak yazar
+(`parameter[path:id].type = int`, `auth.required = true`, `body.property[Name].example = "Laptop"` …). `EndpointFingerprint`
+bu olguların SHA-256 özetidir. Aynı kimlikte parmak izi farklıysa **Modified**; *neyin* değiştiğini ADR 0002'deki diff olgulardan çıkarır.
+HTTP method ve kanonik route olgu değil kimliktir. Örneğin **kaynağı** (dosya adı, satır numarası) olgulara girmez: kodu
+taşımak veya araya satır eklemek endpoint'i "değişmiş" göstermemelidir. Örneğin **değeri** girer. Bilinmeyen (null) değerler
+yazılmaz; "varsayılan eklendi/kaldırıldı" böyle görünür.
 
 ## Karar: yeniden adlandırma yalnızca aday olarak raporlanır
 
@@ -66,20 +68,22 @@ birleştirilmez veya silinmez. Belirsiz eşleşme (aynı action'ın birden çok 
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "identityVersion": 1,
   "collection": { "fileName": "sample-api.postman_collection.json", "sha256": "…" },
   "endpoints": [
     { "id": "GET /api/products/{:int}", "fingerprint": "…", "httpMethod": "GET",
-      "route": "api/Products/{id:int}", "controllerName": "Products", "actionName": "GetById" }
+      "route": "api/Products/{id:int}", "controllerName": "Products", "actionName": "GetById",
+      "contract": { "auth.required": "false", "endpoint.action": "GetById", "parameter[path:id].type": "int" } }
   ]
 }
 ```
 
 - **Önceki collection**: collection dosyasının kendisi snapshot'ın yanında ayrı dosya olarak durur; snapshot yalnızca
   dosya adını ve LF-normalize SHA-256 özetini tutar (saklanan collection snapshot ile uyuşuyor mu diye).
-- **Önceki analiz metadata'sı**: endpoint başına kimlik, parmak izi ve son bilinen adlar. Tam `EndpointDefinition` saklanmaz;
-  alan düzeyinde fark gerekirse sonraki faz saklanan collection'ı kullanır veya `schemaVersion` yükseltilir.
+- **Önceki analiz metadata'sı**: endpoint başına kimlik, parmak izi, son bilinen adlar ve sözleşme olguları (`contract`,
+  şema sürümü 2). Tam `EndpointDefinition` saklanmaz; olgular "ne değişti" sorusunu yanıtlamaya yeter ve Git'te satır satır okunur.
+  Parmak izi olgulardan türetildiği için okuma sırasında doğrulanır; uyuşmayan dosya "elle düzenlenmiş" sayılıp reddedilir.
 - **Deterministik**: endpoint'ler kimliğe göre sıralı, LF, zaman damgası yok, mutlak yol yok, secret yok. Değişmemiş bir API
   her seferinde birebir aynı dosyayı üretir (Git'te anlamlı diff).
 - **Sürümleme**: `identityVersion` kanonikleştirme kuralları değişirse, `schemaVersion` dosya biçimi değişirse artar.

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "identityVersion": 1,
   "collection": {
     "fileName": "sample-api.postman_collection.json",
@@ -8,123 +8,320 @@
   "endpoints": [
     {
       "id": "DELETE /api/customers/{:int}",
-      "fingerprint": "a1ac852c9121cb0771af11bbfb42807a565286529346180c1efdac33913767f9",
+      "fingerprint": "ba4a15b4f68b5d4d05cd4ce33c27a3ea794f94e9fc02838dbb290e8afe3af3de",
       "httpMethod": "DELETE",
       "route": "api/Customers/{id:int}",
       "controllerName": "Customers",
-      "actionName": "Delete"
+      "actionName": "Delete",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "Delete",
+        "endpoint.controller": "Customers",
+        "endpoint.route": "api/Customers/{id:int}",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int"
+      }
     },
     {
       "id": "DELETE /api/orders/{:int}",
-      "fingerprint": "6df9b138b1d9e6d38459a8b47729c13190a33ca4953df47ac88f1df91a3aebc2",
+      "fingerprint": "f308bc34c5e9790c50339d714894bcb0fad463f979c15e2ba5f70091849899bf",
       "httpMethod": "DELETE",
       "route": "api/Orders/{id:int}",
       "controllerName": "Orders",
-      "actionName": "Delete"
+      "actionName": "Delete",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "Delete",
+        "endpoint.controller": "Orders",
+        "endpoint.route": "api/Orders/{id:int}",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int"
+      }
     },
     {
       "id": "DELETE /api/products/{:int}",
-      "fingerprint": "9982df0f2821181b767b44e166363155c62d8ce868a10e0779a26543df834fb3",
+      "fingerprint": "7d463933b7072a7df7de8394531b1c3489aacb81ef7db89d238fe01467596281",
       "httpMethod": "DELETE",
       "route": "api/Products/{id:int}",
       "controllerName": "Products",
-      "actionName": "Delete"
+      "actionName": "Delete",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "Delete",
+        "endpoint.controller": "Products",
+        "endpoint.route": "api/Products/{id:int}",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int"
+      }
     },
     {
       "id": "GET /api/customers",
-      "fingerprint": "4f58dd4d2fdac486533b1eae48659c85e06a984ae6c76ba7a2890f6238908f97",
+      "fingerprint": "4bfb43473cb377970bbd69274f5cde5a4bc10e378797b206adee40e52b9908f5",
       "httpMethod": "GET",
       "route": "api/Customers",
       "controllerName": "Customers",
-      "actionName": "GetAll"
+      "actionName": "GetAll",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "GetAll",
+        "endpoint.controller": "Customers",
+        "endpoint.route": "api/Customers"
+      }
     },
     {
       "id": "GET /api/customers/{:int}",
-      "fingerprint": "ad521aa7dcf46860550ad4e09d395ff58f18453ee15319402b39ac0dbe6f466f",
+      "fingerprint": "060241cc48f408e68547bc0dc39a0597b02e3a26008ddc062e5baaa14de155e8",
       "httpMethod": "GET",
       "route": "api/Customers/{id:int}",
       "controllerName": "Customers",
-      "actionName": "GetById"
+      "actionName": "GetById",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "GetById",
+        "endpoint.controller": "Customers",
+        "endpoint.route": "api/Customers/{id:int}",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int"
+      }
     },
     {
       "id": "GET /api/orders",
-      "fingerprint": "6f90d90eead51de52dc62c1aef4957492d6b862c60c93f7e75bcfe09d86d66cf",
+      "fingerprint": "b24fdf6098faadf97fee841d1e87125061c65f49dded00bf19c21136330dc584",
       "httpMethod": "GET",
       "route": "api/Orders",
       "controllerName": "Orders",
-      "actionName": "GetAll"
+      "actionName": "GetAll",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "GetAll",
+        "endpoint.controller": "Orders",
+        "endpoint.route": "api/Orders"
+      }
     },
     {
       "id": "GET /api/orders/{:int}",
-      "fingerprint": "20528b63a57ac2b338b0684322ad43cad87e612dc0b94e9aa0a0a99317156ac0",
+      "fingerprint": "36f79c691167b4c5df0d97bdc2ec5472219e33978f9e202d0d7435336e8de3cd",
       "httpMethod": "GET",
       "route": "api/Orders/{id:int}",
       "controllerName": "Orders",
-      "actionName": "GetById"
+      "actionName": "GetById",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "GetById",
+        "endpoint.controller": "Orders",
+        "endpoint.route": "api/Orders/{id:int}",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int"
+      }
     },
     {
       "id": "GET /api/products",
-      "fingerprint": "2ac1af357a630cbd566ddc297c6bccf466226f3c99c0ba6db10a65f786eb74bb",
+      "fingerprint": "1dbd40055dd2701129e37b54e1a831c6b8dca1d64bf7a0c2975f51efecae756f",
       "httpMethod": "GET",
       "route": "api/Products",
       "controllerName": "Products",
-      "actionName": "GetAll"
+      "actionName": "GetAll",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "GetAll",
+        "endpoint.controller": "Products",
+        "endpoint.route": "api/Products"
+      }
     },
     {
       "id": "GET /api/products/{:int}",
-      "fingerprint": "bd961f7b88bc6b08dcf7796ab3b7d98972e9ffdee1eb76a761c0cf4d9f191034",
+      "fingerprint": "a54d3ab6ba75a691eda248d4badbf0da61cf84b0cf3d5e4b15c9f470b4f5fd37",
       "httpMethod": "GET",
       "route": "api/Products/{id:int}",
       "controllerName": "Products",
-      "actionName": "GetById"
+      "actionName": "GetById",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "GetById",
+        "endpoint.controller": "Products",
+        "endpoint.route": "api/Products/{id:int}",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int",
+        "response[200].contentType": "application/json",
+        "response[200].example": "{\"id\":1,\"name\":\"Laptop\",\"price\":1299.9}",
+        "response[200].exampleComplete": "true"
+      }
     },
     {
       "id": "POST /api/customers",
-      "fingerprint": "c2c50d4df42eb6095fc6698ebcb14dcae49eb68892659a0b7ca2d200eaf58211",
+      "fingerprint": "2afa40aef1f7d4b8b8b47577e1d2bfa875fdb2a7d183850dbe0ed9329fd72287",
       "httpMethod": "POST",
       "route": "api/Customers",
       "controllerName": "Customers",
-      "actionName": "Create"
+      "actionName": "Create",
+      "contract": {
+        "auth.required": "false",
+        "body.contentType": "application/json",
+        "body.example": "{\"fullName\":\"Ada Example\",\"email\":\"ada@example.com\"}",
+        "body.exampleComplete": "true",
+        "body.propertyOrder[].names": "FullName,Email",
+        "body.property[Email].nullable": "false",
+        "body.property[Email].required": "true",
+        "body.property[Email].type": "string",
+        "body.property[FullName].nullable": "false",
+        "body.property[FullName].required": "true",
+        "body.property[FullName].type": "string",
+        "body.required": "true",
+        "body.type": "CreateCustomerRequest",
+        "endpoint.action": "Create",
+        "endpoint.controller": "Customers",
+        "endpoint.route": "api/Customers",
+        "parameter[body:request].required": "true",
+        "parameter[body:request].type": "CreateCustomerRequest"
+      }
     },
     {
       "id": "POST /api/orders",
-      "fingerprint": "b2da5084744dc1acccaa054d5ac3c97ee89be6f8ed0d338bcea27a4aaf03eb52",
+      "fingerprint": "9769c819d31351ab5dd0a2f1333a87fe82d0e522a7913a5f85066179a6288b07",
       "httpMethod": "POST",
       "route": "api/Orders",
       "controllerName": "Orders",
-      "actionName": "Create"
+      "actionName": "Create",
+      "contract": {
+        "auth.required": "false",
+        "body.contentType": "application/json",
+        "body.example": "{\"customerId\":1,\"productId\":1,\"quantity\":2}",
+        "body.exampleComplete": "true",
+        "body.propertyOrder[].names": "CustomerId,ProductId,Quantity",
+        "body.property[CustomerId].nullable": "false",
+        "body.property[CustomerId].required": "false",
+        "body.property[CustomerId].type": "int",
+        "body.property[ProductId].nullable": "false",
+        "body.property[ProductId].required": "false",
+        "body.property[ProductId].type": "int",
+        "body.property[Quantity].nullable": "false",
+        "body.property[Quantity].required": "false",
+        "body.property[Quantity].type": "int",
+        "body.required": "true",
+        "body.type": "CreateOrderRequest",
+        "endpoint.action": "Create",
+        "endpoint.controller": "Orders",
+        "endpoint.route": "api/Orders",
+        "parameter[body:request].required": "true",
+        "parameter[body:request].type": "CreateOrderRequest"
+      }
     },
     {
       "id": "POST /api/products",
-      "fingerprint": "ef0b77720fc113a8a2ed9855f045f001c1f0b0d5f3d6b3bfae4bb41b7efacc1b",
+      "fingerprint": "1945436417084c3a2901f455540f6e566dff333ec1eb04d9e96857153eb8e071",
       "httpMethod": "POST",
       "route": "api/Products",
       "controllerName": "Products",
-      "actionName": "Create"
+      "actionName": "Create",
+      "contract": {
+        "auth.required": "false",
+        "body.contentType": "application/json",
+        "body.example": "{\"name\":\"Laptop\",\"price\":1299.9}",
+        "body.exampleComplete": "true",
+        "body.propertyOrder[].names": "Name,Price",
+        "body.property[Name].nullable": "false",
+        "body.property[Name].required": "true",
+        "body.property[Name].type": "string",
+        "body.property[Price].nullable": "false",
+        "body.property[Price].required": "false",
+        "body.property[Price].type": "decimal",
+        "body.required": "true",
+        "body.type": "CreateProductRequest",
+        "endpoint.action": "Create",
+        "endpoint.controller": "Products",
+        "endpoint.route": "api/Products",
+        "parameter[body:request].required": "true",
+        "parameter[body:request].type": "CreateProductRequest"
+      }
     },
     {
       "id": "PUT /api/customers/{:int}",
-      "fingerprint": "48417ad761ae30e66f11bcdbdd5a87d6da7c90dad9ca9f3718ab6b0001853526",
+      "fingerprint": "67957dff8324db5a4720a7a05bf1ce353676391bde9b4243cb7fa106555e3555",
       "httpMethod": "PUT",
       "route": "api/Customers/{id:int}",
       "controllerName": "Customers",
-      "actionName": "Update"
+      "actionName": "Update",
+      "contract": {
+        "auth.required": "false",
+        "body.contentType": "application/json",
+        "body.example": "{\"fullName\":\"Ada Example\",\"email\":\"ada@example.com\"}",
+        "body.exampleComplete": "true",
+        "body.propertyOrder[].names": "FullName,Email",
+        "body.property[Email].nullable": "false",
+        "body.property[Email].required": "true",
+        "body.property[Email].type": "string",
+        "body.property[FullName].nullable": "false",
+        "body.property[FullName].required": "true",
+        "body.property[FullName].type": "string",
+        "body.required": "true",
+        "body.type": "UpdateCustomerRequest",
+        "endpoint.action": "Update",
+        "endpoint.controller": "Customers",
+        "endpoint.route": "api/Customers/{id:int}",
+        "parameter[body:request].required": "true",
+        "parameter[body:request].type": "UpdateCustomerRequest",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int",
+        "parameters.order": "path:id,body:request"
+      }
     },
     {
       "id": "PUT /api/orders/{:int}",
-      "fingerprint": "9b0202cb28e4ddc014f42e95fe4145d4513ba55d7daf9474869589c411e252d9",
+      "fingerprint": "7ad3435ab7ca33c3e5dcf116438ec6dceca5b08139495159b33d40f731ec8112",
       "httpMethod": "PUT",
       "route": "api/Orders/{id:int}",
       "controllerName": "Orders",
-      "actionName": "Update"
+      "actionName": "Update",
+      "contract": {
+        "auth.required": "false",
+        "body.contentType": "application/json",
+        "body.example": "{\"quantity\":3}",
+        "body.exampleComplete": "true",
+        "body.property[Quantity].nullable": "false",
+        "body.property[Quantity].required": "false",
+        "body.property[Quantity].type": "int",
+        "body.required": "true",
+        "body.type": "UpdateOrderRequest",
+        "endpoint.action": "Update",
+        "endpoint.controller": "Orders",
+        "endpoint.route": "api/Orders/{id:int}",
+        "parameter[body:request].required": "true",
+        "parameter[body:request].type": "UpdateOrderRequest",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int",
+        "parameters.order": "path:id,body:request"
+      }
     },
     {
       "id": "PUT /api/products/{:int}",
-      "fingerprint": "4af1238524369c44e49d2076c839ab8d9296336501338546d50d65a665955481",
+      "fingerprint": "e33cfc7c3d8e52bdff7f53a679258d4f37d9aca413fd8f3710649e895487c001",
       "httpMethod": "PUT",
       "route": "api/Products/{id:int}",
       "controllerName": "Products",
-      "actionName": "Update"
+      "actionName": "Update",
+      "contract": {
+        "auth.required": "false",
+        "body.contentType": "application/json",
+        "body.example": "{\"name\":\"Laptop Pro\",\"price\":1499.9}",
+        "body.exampleComplete": "true",
+        "body.propertyOrder[].names": "Name,Price",
+        "body.property[Name].nullable": "false",
+        "body.property[Name].required": "true",
+        "body.property[Name].type": "string",
+        "body.property[Price].nullable": "false",
+        "body.property[Price].required": "false",
+        "body.property[Price].type": "decimal",
+        "body.required": "true",
+        "body.type": "UpdateProductRequest",
+        "endpoint.action": "Update",
+        "endpoint.controller": "Products",
+        "endpoint.route": "api/Products/{id:int}",
+        "parameter[body:request].required": "true",
+        "parameter[body:request].type": "UpdateProductRequest",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int",
+        "parameters.order": "path:id,body:request"
+      }
     }
   ]
 }

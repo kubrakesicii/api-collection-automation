@@ -52,6 +52,14 @@ public static class AnalysisSnapshotStore
             throw new InvalidDataException($"{sourceName}: endpoint identity '{duplicate.Key}' appears more than once.");
         }
 
+        // The fingerprint is derived from the contract; a mismatch means the file was edited by hand, and a diff against it would lie.
+        var tampered = snapshot.Endpoints.FirstOrDefault(e => EndpointFingerprint.FromContract(e.Contract) != e.Fingerprint);
+        if (tampered is not null)
+        {
+            throw new InvalidDataException(
+                $"{sourceName}: the fingerprint of endpoint '{tampered.Id}' does not match its contract; the snapshot was edited by hand or is corrupt.");
+        }
+
         return snapshot;
     }
 
