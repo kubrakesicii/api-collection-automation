@@ -2,6 +2,7 @@ using ApiCollection.Analysis.Discovery;
 using ApiCollection.Core.Diff;
 using ApiCollection.Core.Models;
 using ApiCollection.Core.Snapshots;
+using ApiCollection.Core.Sync;
 using ApiCollection.Infrastructure.Configuration;
 using ApiCollection.Infrastructure.FileSystem;
 using ApiCollection.Postman.Generation;
@@ -21,6 +22,9 @@ public static class CliApplication
     /// <summary>Returned by <c>diff --exit-code</c> when anything was added, modified or removed.</summary>
     public const int ChangesDetected = 2;
 
+    /// <summary>Returned by <c>sync</c> when the safety gate blocked it; nothing was written.</summary>
+    public const int Blocked = 3;
+
     public const string Usage = """
         Usage:
           ApiCollection.Cli discover <api-source-directory> [--examples <example-metadata.json>]
@@ -29,9 +33,20 @@ public static class CliApplication
                                      [--snapshot <snapshot.json>] [--strict]
           ApiCollection.Cli diff <api-source-directory> --baseline <snapshot.json> [--examples <example-metadata.json>]
                                  [--changes <changes.json>] [--report <diff.txt>] [--exit-code]
+          ApiCollection.Cli sync <api-source-directory> --baseline <snapshot.json> --out <collection.json>
+                                 [--examples <example-metadata.json>] [--name <collection-name>] [--base-url <url>]
+                                 [--dry-run] [--max-removed <n>] [--max-removed-percent <0-100>] [--allow-incomplete-discovery]
+                                 [--plan <plan.json>] [--changes <changes.json>] [--report <sync.txt>]
 
         'discover' prints the discovery report. 'generate' builds a Postman Collection v2.1 file locally; nothing is sent to Postman.
         'diff' compares the current API with a baseline snapshot and prints what was added, modified, removed or unchanged.
+        'sync' brings the stored collection and its baseline snapshot up to date, but only if the safety gate allows it: it blocks
+          (exit code 3, nothing written) when discovery failed or may be incomplete, when the stored collection no longer matches
+          the baseline, or when too many endpoints would be deleted. With nothing changed it writes nothing. Nothing is sent to Postman.
+        --dry-run   show the decision and the plan; never write the collection or the baseline
+        --max-removed / --max-removed-percent   deletion limits (defaults: 10 endpoints, 30%); raise them only on purpose
+        --allow-incomplete-discovery   go ahead although discovery reported failures that may have hidden endpoints (stays listed)
+        --plan      write the decision and plan as JSON
         --out       write the collection to a file (otherwise it is printed to stdout)
         --report    generate: write the discovery report (JSON for a .json extension, readable text otherwise); diff: write the diff report
         --snapshot  write the endpoint snapshot (identities, contract facts, collection hash); an existing file is overwritten.
@@ -46,11 +61,14 @@ public static class CliApplication
     private static readonly string[] DiscoverOptions = ["--examples"];
     private static readonly string[] GenerateOptions = ["--examples", "--name", "--base-url", "--out", "--report", "--snapshot"];
     private static readonly string[] DiffOptions = ["--examples", "--baseline", "--changes", "--report"];
+    private static readonly string[] SyncOptions =
+        ["--examples", "--name", "--base-url", "--baseline", "--out", "--plan", "--changes", "--report", "--max-removed", "--max-removed-percent"];
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
         if (!TryParse(args, out var command, out var directory, out var values, out var flags)
-            || (command == "diff" && !values.ContainsKey("--baseline")))
+            || (command == "diff" && !values.ContainsKey("--baseline"))
+            || (command == "sync" && (!values.ContainsKey("--baseline") || !values.ContainsKey("--out"))))
         {
             error.WriteLine(Usage);
             return Failure;
@@ -66,6 +84,7 @@ public static class CliApplication
         {
             "generate" => new[] { "--out", "--report", "--snapshot" },
             "diff" => ["--changes", "--report"],
+            "sync" => ["--out", "--baseline", "--plan", "--changes", "--report"],
             _ => []
         };
         if (!ValidateOutputs(directory, values, written, error))
@@ -73,8 +92,16 @@ public static class CliApplication
             return Failure;
         }
 
+        var limits = new SyncSafetyOptions { AllowIncompleteDiscovery = flags.Contains("--allow-incomplete-discovery") };
+        if (command == "sync" && !TryReadLimits(values, limits, error, out limits))
+        {
+            return Failure;
+        }
+
+        // A sync may start without a baseline (the first sync); every other command needs one that can be read.
         AnalysisSnapshot? baseline = null;
-        if (command == "diff" && !TryLoadBaseline(values["--baseline"], error, out baseline))
+        var baselineRequired = command == "diff" || (command == "sync" && File.Exists(values["--baseline"]));
+        if (baselineRequired && !TryLoadBaseline(values["--baseline"], error, out baseline))
         {
             return Failure;
         }
@@ -93,14 +120,178 @@ public static class CliApplication
             }
         }
 
-        var result = new EndpointDiscoveryEngine().DiscoverFromDirectory(directory, examples);
+        EndpointDiscoveryResult result;
+        try
+        {
+            result = new EndpointDiscoveryEngine().DiscoverFromDirectory(directory, examples);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Fail closed: a source that cannot be read is a failed analysis, never an empty API.
+            error.WriteLine($"Discovery failed: {exception.Message}");
+            return Failure;
+        }
 
         return command switch
         {
             "discover" => Discover(result, output),
             "generate" => Generate(result, values, flags.Contains("--strict"), output, error),
-            _ => Diff(result, baseline!, values, flags.Contains("--exit-code"), output, error)
+            "diff" => Diff(result, baseline!, values, flags.Contains("--exit-code"), output, error),
+            _ => Sync(result, baseline, values, flags.Contains("--dry-run"), limits, output, error)
         };
+    }
+
+    private static bool TryReadLimits(Dictionary<string, string> values, SyncSafetyOptions defaults, TextWriter error, out SyncSafetyOptions limits)
+    {
+        limits = defaults;
+        if (values.TryGetValue("--max-removed-percent", out var percentText))
+        {
+            if (!double.TryParse(percentText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent)
+                || percent is < 0 or > 100)
+            {
+                error.WriteLine("--max-removed-percent must be a number between 0 and 100.");
+                return false;
+            }
+
+            limits = limits with { MaxRemovedPercent = percent };
+        }
+
+        if (values.TryGetValue("--max-removed", out var countText))
+        {
+            if (!int.TryParse(countText, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var count))
+            {
+                error.WriteLine("--max-removed must be a whole number of endpoints (0 or more).");
+                return false;
+            }
+
+            limits = limits with { MaxRemovedCount = count };
+        }
+
+        return true;
+    }
+
+    // ---- sync ----
+
+    private static int Sync(
+        EndpointDiscoveryResult result, AnalysisSnapshot? baseline, Dictionary<string, string> values, bool dryRun,
+        SyncSafetyOptions limits, TextWriter output, TextWriter error)
+    {
+        var collectionPath = values["--out"];
+        var baselinePath = values["--baseline"];
+
+        AnalysisSnapshot current;
+        try
+        {
+            current = AnalysisSnapshot.Create(result.Endpoints);
+        }
+        catch (ArgumentException exception)
+        {
+            error.WriteLine($"Cannot sync: {exception.Message}");
+            return Failure;
+        }
+
+        ChangeSet changes;
+        try
+        {
+            changes = ChangeSetBuilder.Build(
+                baseline ?? AnalysisSnapshot.Create([]), current, result.Warnings.Select(w => $"Discovery: {w}"));
+        }
+        catch (InvalidOperationException exception)
+        {
+            error.WriteLine(exception.Message);
+            return Failure;
+        }
+
+        var decision = SyncSafetyValidator.Validate(
+            new SyncSafetyInput
+            {
+                Changes = changes,
+                BaselineCollection = ClassifyBaselineCollection(baseline, collectionPath),
+                DiscoveryFailures = result.Failures,
+                DiscoveryWarnings = result.Warnings.Except(result.Failures).ToList()
+            },
+            limits);
+
+        var report = SyncReportWriter.ToText(decision, changes, dryRun, baseline is not null);
+        output.Write(report);
+
+        // Reports describe the decision; they are written in every case, including dry runs and blocked runs.
+        foreach (var (option, content) in new[]
+        {
+            ("--report", report),
+            ("--plan", SyncDecisionSerializer.Serialize(decision)),
+            ("--changes", ChangeSetSerializer.Serialize(changes))
+        })
+        {
+            if (values.TryGetValue(option, out var path) && !TryWrite(path, content, error))
+            {
+                return Failure;
+            }
+        }
+
+        if (decision.Outcome == SyncOutcome.Blocked)
+        {
+            return Blocked;
+        }
+
+        if (decision.Outcome == SyncOutcome.NoChanges || dryRun)
+        {
+            return Success;
+        }
+
+        var collection = new PostmanCollectionGenerator().Generate(result.Endpoints, new PostmanCollectionOptions
+        {
+            Name = values.GetValueOrDefault("--name", "API Collection"),
+            BaseUrl = values.GetValueOrDefault("--base-url", "http://localhost:5000")
+        });
+        var json = PostmanCollectionSerializer.Serialize(collection);
+        var newBaseline = AnalysisSnapshot.Create(result.Endpoints, SnapshotCollection.FromJson(collectionPath, json));
+
+        try
+        {
+            // The baseline goes last: it refers to the collection by hash (see AtomicFileWriter).
+            AtomicFileWriter.WriteAll([(collectionPath, json), (baselinePath, AnalysisSnapshotStore.Serialize(newBaseline))]);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            error.WriteLine($"Cannot write the collection and baseline: {exception.Message}");
+            return Failure;
+        }
+
+        output.WriteLine($"Wrote collection {collectionPath}");
+        output.WriteLine($"Wrote baseline {baselinePath}");
+        return Success;
+    }
+
+    private static BaselineCollectionState ClassifyBaselineCollection(AnalysisSnapshot? baseline, string collectionPath)
+    {
+        if (baseline is null)
+        {
+            return BaselineCollectionState.NotApplicable;
+        }
+
+        if (baseline.Collection is null)
+        {
+            return BaselineCollectionState.NoReference;
+        }
+
+        if (!string.Equals(baseline.Collection.FileName, Path.GetFileName(collectionPath), StringComparison.Ordinal))
+        {
+            return BaselineCollectionState.NameMismatch;
+        }
+
+        try
+        {
+            return !File.Exists(collectionPath)
+                ? BaselineCollectionState.Missing
+                : SnapshotCollection.FromJson(collectionPath, File.ReadAllText(collectionPath)).Sha256 == baseline.Collection.Sha256
+                    ? BaselineCollectionState.Verified
+                    : BaselineCollectionState.Changed;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return BaselineCollectionState.Missing;
+        }
     }
 
     private static int Discover(EndpointDiscoveryResult result, TextWriter output)
@@ -306,21 +497,27 @@ public static class CliApplication
         values = [];
         flags = [];
 
-        if (args.Length < 2 || args[0] is not ("discover" or "generate" or "diff"))
+        if (args.Length < 2 || args[0] is not ("discover" or "generate" or "diff" or "sync"))
         {
             return false;
         }
 
         command = args[0];
         directory = args[1];
-        var allowed = command switch { "discover" => DiscoverOptions, "generate" => GenerateOptions, _ => DiffOptions };
-        var allowedFlag = command switch { "generate" => "--strict", "diff" => "--exit-code", _ => string.Empty };
+        var allowed = command switch { "discover" => DiscoverOptions, "generate" => GenerateOptions, "diff" => DiffOptions, _ => SyncOptions };
+        string[] allowedFlags = command switch
+        {
+            "generate" => ["--strict"],
+            "diff" => ["--exit-code"],
+            "sync" => ["--dry-run", "--allow-incomplete-discovery"],
+            _ => []
+        };
 
         for (var i = 2; i < args.Length; i++)
         {
-            if (args[i] == allowedFlag && !flags.Contains(allowedFlag))
+            if (allowedFlags.Contains(args[i]) && !flags.Contains(args[i]))
             {
-                flags.Add(allowedFlag);
+                flags.Add(args[i]);
             }
             else if (allowed.Contains(args[i]) && i + 1 < args.Length && !values.ContainsKey(args[i]))
             {
@@ -339,7 +536,10 @@ public static class CliApplication
     private static bool ValidateOutputs(string directory, Dictionary<string, string> values, string[] outputOptions, TextWriter error)
     {
         var outputs = outputOptions.Where(values.ContainsKey).Select(option => (Option: option, Path: values[option])).ToList();
-        var compared = values.ContainsKey("--baseline") ? [.. outputs, ("--baseline", values["--baseline"])] : outputs;
+        // The baseline is compared with the outputs too; for sync it is itself one of the outputs and must not be compared with itself.
+        var compared = values.ContainsKey("--baseline") && outputs.TrueForAll(o => o.Option != "--baseline")
+            ? [.. outputs, ("--baseline", values["--baseline"])]
+            : outputs;
 
         for (var i = 0; i < compared.Count; i++)
         {

@@ -42,9 +42,12 @@ public sealed partial class EndpointDiscoveryEngine
 
     private static EndpointDiscoveryResult Discover(List<(string Path, string Text)> files, ExampleMetadata? examples)
     {
-        var warnings = new List<string>();
+        var log = new DiscoveryLog();
+        var warnings = log.Warnings;
         var exampleDiagnostics = new List<ExampleDiagnostic>();
-        var roots = files.Select(f => CSharpSyntaxTree.ParseText(f.Text, path: f.Path).GetRoot()).ToList();
+        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Text, path: f.Path)).ToList();
+        ReportSyntaxErrors(trees, files, log);
+        var roots = trees.Select(t => t.GetRoot()).ToList();
         var classes = CollectClasses(roots);
         var catalog = new SourceCatalog(roots);
         var dto = new DtoModelBuilder(catalog, exampleDiagnostics);
@@ -71,7 +74,7 @@ public sealed partial class EndpointDiscoveryEngine
             var chain = BuildChain(group, classes, out var reachesFramework);
             if (IsController(group, chain, reachesFramework))
             {
-                endpoints.AddRange(DiscoverController(group, chain, extractor, exampleBuilder, warnings));
+                endpoints.AddRange(DiscoverController(group, chain, extractor, exampleBuilder, log));
             }
         }
 
@@ -85,14 +88,37 @@ public sealed partial class EndpointDiscoveryEngine
 
         foreach (var shared in ordered.GroupBy(e => e.Id).Where(g => g.Select(e => (e.ControllerName, e.ActionName)).Distinct().Count() > 1))
         {
-            warnings.Add(
+            log.Fail(
                 $"Endpoint identity '{shared.Key}' is produced by more than one action " +
                 $"({string.Join(", ", shared.Select(e => $"{e.ControllerName}.{e.ActionName}").Distinct())}); identities must be unique.");
         }
 
         exampleBuilder.ReportUnmatchedMetadata(ordered);
 
-        return new EndpointDiscoveryResult(ordered, warnings.Distinct().ToList(), exampleDiagnostics.Distinct().ToList());
+        return new EndpointDiscoveryResult(
+            ordered, warnings.Distinct().ToList(), exampleDiagnostics.Distinct().ToList(), log.Failures.Distinct().ToList());
+    }
+
+    /// <summary>
+    /// The parser recovers from syntax errors by dropping what it cannot read, so a broken file can silently lose a controller or an
+    /// action. That is exactly the kind of failure a sync must not mistake for "the endpoint was deleted".
+    /// </summary>
+    private static void ReportSyntaxErrors(List<SyntaxTree> trees, List<(string Path, string Text)> files, DiscoveryLog log)
+    {
+        for (var i = 0; i < trees.Count; i++)
+        {
+            var errors = trees[i].GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+            if (errors.Count == 0)
+            {
+                continue;
+            }
+
+            var name = files[i].Path.Length > 0 ? files[i].Path : $"source #{i + 1}";
+            var first = errors[0];
+            log.Fail(
+                $"{name}: the source has {errors.Count} syntax error(s) (first: {first.GetMessage(System.Globalization.CultureInfo.InvariantCulture)} " +
+                $"at line {first.Location.GetLineSpan().StartLinePosition.Line + 1}); endpoints in it may be missing.");
+        }
     }
 
     private static bool IsBuildOutput(string relativePath) =>
@@ -195,7 +221,7 @@ public sealed partial class EndpointDiscoveryEngine
     // ---- endpoint discovery ----
 
     private static IEnumerable<EndpointDefinition> DiscoverController(
-        ClassGroup group, List<ClassGroup> chain, EndpointMetadataExtractor extractor, ExampleBuilder examples, List<string> warnings)
+        ClassGroup group, List<ClassGroup> chain, EndpointMetadataExtractor extractor, ExampleBuilder examples, DiscoveryLog log)
     {
         var classAttributes = chain.SelectMany(g => g.Declarations).SelectMany(Attributes).ToList();
         var controllerName = group.Name.Length > "Controller".Length && group.Name.EndsWith("Controller", StringComparison.Ordinal)
@@ -214,7 +240,7 @@ public sealed partial class EndpointDiscoveryEngine
         }
         else
         {
-            controllerTemplates = ResolveTemplates(classRoutes, group.Name, warnings);
+            controllerTemplates = ResolveTemplates(classRoutes, group.Name, log);
             if (controllerTemplates.Count == 0)
             {
                 yield break;
@@ -250,13 +276,13 @@ public sealed partial class EndpointDiscoveryEngine
             {
                 if (routeAttributes.Count > 0)
                 {
-                    warnings.Add($"{owner}: [Route] without an HTTP method attribute is not supported and was skipped.");
+                    log.Fail($"{owner}: [Route] without an HTTP method attribute is not supported and was skipped.");
                 }
 
                 continue;
             }
 
-            var routeTemplates = ResolveTemplates(routeAttributes, owner, warnings);
+            var routeTemplates = ResolveTemplates(routeAttributes, owner, log);
             foreach (var http in httpAttributes)
             {
                 List<string> actionTemplates;
@@ -265,7 +291,7 @@ public sealed partial class EndpointDiscoveryEngine
                 {
                     if (!TryEvaluate(templateArgument, out var template))
                     {
-                        warnings.Add($"{owner}: route template is not a string literal and was skipped.");
+                        log.Fail($"{owner}: route template is not a string literal and was skipped.");
                         continue;
                     }
 
@@ -288,11 +314,11 @@ public sealed partial class EndpointDiscoveryEngine
                         var route = Normalize(ReplaceTokens(Combine(controllerTemplate, actionTemplate), controllerName, method.Identifier.Text));
                         if (UnresolvedToken().IsMatch(StripBraces().Replace(route, string.Empty)))
                         {
-                            warnings.Add($"{owner}: route '{route}' contains an unsupported token.");
+                            log.Fail($"{owner}: route '{route}' contains an unsupported token.");
                         }
 
                         var id = EndpointIdentity.Create(httpMethod, route);
-                        var metadata = extractor.Extract(method, classAttributes, route, owner, warnings);
+                        var metadata = extractor.Extract(method, classAttributes, route, owner, log.Warnings);
                         yield return new EndpointDefinition
                         {
                             Id = id,
@@ -322,7 +348,7 @@ public sealed partial class EndpointDiscoveryEngine
 
     // ---- route handling ----
 
-    private static List<string> ResolveTemplates(IEnumerable<AttributeSyntax> routeAttributes, string owner, List<string> warnings)
+    private static List<string> ResolveTemplates(IEnumerable<AttributeSyntax> routeAttributes, string owner, DiscoveryLog log)
     {
         var templates = new List<string>();
         foreach (var attribute in routeAttributes)
@@ -338,7 +364,7 @@ public sealed partial class EndpointDiscoveryEngine
             }
             else
             {
-                warnings.Add($"{owner}: route template is not a string literal and was skipped.");
+                log.Fail($"{owner}: route template is not a string literal and was skipped.");
             }
         }
 
