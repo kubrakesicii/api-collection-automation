@@ -16,7 +16,22 @@ internal static class PostmanCheckCommand
     public const string WorkspaceSecret = "Postman:WorkspaceId";
 
     /// <summary>A value and where it came from, so the report can say which source was used without revealing the value.</summary>
-    private sealed record Setting(string Value, string Source);
+    internal sealed record Setting(string Value, string Source);
+
+    /// <summary>
+    /// Finds the API key and workspace id. Precedence: explicit option, then the environment (CI), then the user secrets file on this
+    /// machine. Throws for an unreadable secrets file (the message never contains the file's content).
+    /// </summary>
+    internal static (Setting? ApiKey, Setting? Workspace) Resolve(CliEnvironment environment, string? workspaceOption)
+    {
+        var apiKey = First(
+            (environment.GetVariable, ApiKeyVariable, "environment variable"),
+            (environment.GetUserSecret, ApiKeySecret, "user secrets"));
+        var workspace = Normalize(workspaceOption) is { } fromOption
+            ? new Setting(fromOption, "--workspace")
+            : First((environment.GetVariable, WorkspaceVariable, "environment variable"), (environment.GetUserSecret, WorkspaceSecret, "user secrets"));
+        return (apiKey, workspace);
+    }
 
     public static int Run(string[] args, TextWriter output, TextWriter error, CliEnvironment environment)
     {
@@ -38,13 +53,7 @@ internal static class PostmanCheckCommand
         Setting? workspace;
         try
         {
-            // Precedence: explicit option, then the environment (CI), then the user secrets file on this machine.
-            apiKey = First(
-                (environment.GetVariable, ApiKeyVariable, "environment variable"),
-                (environment.GetUserSecret, ApiKeySecret, "user secrets"));
-            workspace = Normalize(workspaceOption) is { } fromOption
-                ? new Setting(fromOption, "--workspace")
-                : First((environment.GetVariable, WorkspaceVariable, "environment variable"), (environment.GetUserSecret, WorkspaceSecret, "user secrets"));
+            (apiKey, workspace) = Resolve(environment, workspaceOption);
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
         {

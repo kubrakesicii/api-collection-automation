@@ -19,6 +19,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The in-memory Postman used by the adapter tests, so the sync publish option can be tested end to end without the network. -->
+    <Compile Include="..\ApiCollection.Postman.Tests\FakePostmanCloud.cs" Link="FakePostmanCloud.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\ApiCollection.Cli\ApiCollection.Cli.csproj" />
   </ItemGroup>
 

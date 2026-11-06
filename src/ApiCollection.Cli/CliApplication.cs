@@ -7,6 +7,7 @@ using ApiCollection.Infrastructure.Configuration;
 using ApiCollection.Infrastructure.FileSystem;
 using ApiCollection.Postman.Generation;
 using ApiCollection.Postman.Serialization;
+using ApiCollection.Postman.Sync;
 
 namespace ApiCollection.Cli;
 
@@ -28,6 +29,12 @@ public static class CliApplication
     /// <summary>Returned by <c>postman-check</c> when Postman could not be reached or refused the request.</summary>
     public const int ConnectionFailed = 4;
 
+    /// <summary>Returned by <c>sync --publish</c> when nothing was synced and Postman is unchanged or restored (see the report).</summary>
+    public const int NotSynced = 5;
+
+    /// <summary>Returned by <c>sync --publish</c> when the collection in Postman may be in a state nobody checked: follow the recovery instructions.</summary>
+    public const int NeedsAttention = 6;
+
     public const string Usage = """
         Usage:
           ApiCollection.Cli discover <api-source-directory> [--examples <example-metadata.json>]
@@ -40,6 +47,7 @@ public static class CliApplication
                                  [--examples <example-metadata.json>] [--name <collection-name>] [--base-url <url>]
                                  [--dry-run] [--max-removed <n>] [--max-removed-percent <0-100>] [--allow-incomplete-discovery]
                                  [--plan <plan.json>] [--changes <changes.json>] [--report <sync.txt>]
+                                 [--publish [--workspace <workspace-id>] [--backup-dir <dir>] [--no-rollback]]
           ApiCollection.Cli postman-check [--workspace <workspace-id>]
 
         'postman-check' makes read-only requests (GET only) to the Postman API to verify the API key and, if a workspace id is
@@ -50,7 +58,17 @@ public static class CliApplication
         'diff' compares the current API with a baseline snapshot and prints what was added, modified, removed or unchanged.
         'sync' brings the stored collection and its baseline snapshot up to date, but only if the safety gate allows it: it blocks
           (exit code 3, nothing written) when discovery failed or may be incomplete, when the stored collection no longer matches
-          the baseline, or when too many endpoints would be deleted. With nothing changed it writes nothing. Nothing is sent to Postman.
+          the baseline, or when too many endpoints would be deleted. With nothing changed it writes nothing.
+          Without --publish nothing is sent to Postman.
+        --publish   also WRITE the collection to the Postman workspace (create it, or update the one this tool maintains, found by --name).
+                    Order: back up what Postman holds (nothing is written if the backup fails), publish, read it back and compare, and
+                    restore the backup if it does not match. The local collection and baseline are updated only after a verified publish.
+                    The key and workspace come from POSTMAN_API_KEY / POSTMAN_WORKSPACE_ID or user secrets, never the command line.
+                    Collections are never deleted. With --dry-run it only reads from Postman and shows what would happen.
+        --workspace   the Postman workspace id (with --publish; default POSTMAN_WORKSPACE_ID or the Postman:WorkspaceId user secret)
+        --backup-dir  where backups of the collection in Postman are stored (with --publish; default: 'backups' next to --out)
+        --no-rollback   with --publish: do not restore the previous collection automatically when verification fails
+        Exit codes of sync: 0 ok, 1 error, 3 blocked, 5 not synced (Postman unchanged or restored), 6 Postman may be wrong: follow the recovery steps
         --dry-run   show the decision and the plan; never write the collection or the baseline
         --max-removed / --max-removed-percent   deletion limits (defaults: 10 endpoints, 30%); raise them only on purpose
         --allow-incomplete-discovery   go ahead although discovery reported failures that may have hidden endpoints (stays listed)
@@ -70,7 +88,7 @@ public static class CliApplication
     private static readonly string[] GenerateOptions = ["--examples", "--name", "--base-url", "--out", "--report", "--snapshot"];
     private static readonly string[] DiffOptions = ["--examples", "--baseline", "--changes", "--report"];
     private static readonly string[] SyncOptions =
-        ["--examples", "--name", "--base-url", "--baseline", "--out", "--plan", "--changes", "--report", "--max-removed", "--max-removed-percent"];
+        ["--examples", "--name", "--base-url", "--baseline", "--out", "--plan", "--changes", "--report", "--max-removed", "--max-removed-percent", "--workspace", "--backup-dir"];
 
     public static int Run(string[] args, TextWriter output, TextWriter error, CliEnvironment? environment = null)
     {
@@ -97,7 +115,7 @@ public static class CliApplication
         {
             "generate" => new[] { "--out", "--report", "--snapshot" },
             "diff" => ["--changes", "--report"],
-            "sync" => ["--out", "--baseline", "--plan", "--changes", "--report"],
+            "sync" => ["--out", "--baseline", "--plan", "--changes", "--report", "--backup-dir"],
             _ => []
         };
         if (!ValidateOutputs(directory, values, written, error))
@@ -109,6 +127,23 @@ public static class CliApplication
         if (command == "sync" && !TryReadLimits(values, limits, error, out limits))
         {
             return Failure;
+        }
+
+        // Everything that is needed to talk to Postman is checked before any work starts; nothing is sent if it is missing.
+        PostmanPublish.Settings? postman = null;
+        if (command == "sync")
+        {
+            var publish = flags.Contains("--publish");
+            if (!publish && (values.ContainsKey("--workspace") || values.ContainsKey("--backup-dir") || flags.Contains("--no-rollback")))
+            {
+                error.WriteLine("--workspace, --backup-dir and --no-rollback only apply together with --publish.");
+                return Failure;
+            }
+
+            if (publish && !PostmanPublish.TryResolve(environment ?? CliEnvironment.Default, values.GetValueOrDefault("--workspace"), error, out postman))
+            {
+                return Failure;
+            }
         }
 
         // A sync may start without a baseline (the first sync); every other command needs one that can be read.
@@ -150,7 +185,7 @@ public static class CliApplication
             "discover" => Discover(result, output),
             "generate" => Generate(result, values, flags.Contains("--strict"), output, error),
             "diff" => Diff(result, baseline!, values, flags.Contains("--exit-code"), output, error),
-            _ => Sync(result, baseline, values, flags.Contains("--dry-run"), limits, output, error)
+            _ => Sync(result, baseline, values, flags, limits, postman, environment ?? CliEnvironment.Default, output, error)
         };
     }
 
@@ -186,9 +221,10 @@ public static class CliApplication
     // ---- sync ----
 
     private static int Sync(
-        EndpointDiscoveryResult result, AnalysisSnapshot? baseline, Dictionary<string, string> values, bool dryRun,
-        SyncSafetyOptions limits, TextWriter output, TextWriter error)
+        EndpointDiscoveryResult result, AnalysisSnapshot? baseline, Dictionary<string, string> values, HashSet<string> flags,
+        SyncSafetyOptions limits, PostmanPublish.Settings? postman, CliEnvironment environment, TextWriter output, TextWriter error)
     {
+        var dryRun = flags.Contains("--dry-run");
         var collectionPath = values["--out"];
         var baselinePath = values["--baseline"];
 
@@ -247,6 +283,11 @@ public static class CliApplication
             return Blocked;
         }
 
+        if (postman is not null)
+        {
+            return SyncToPostman(result, current, postman, changes, decision, report, values, dryRun, !flags.Contains("--no-rollback"), environment, output, error);
+        }
+
         if (decision.Outcome == SyncOutcome.NoChanges || dryRun)
         {
             return Success;
@@ -268,6 +309,65 @@ public static class CliApplication
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             error.WriteLine($"Cannot write the collection and baseline: {exception.Message}");
+            return Failure;
+        }
+
+        output.WriteLine($"Wrote collection {collectionPath}");
+        output.WriteLine($"Wrote baseline {baselinePath}");
+        return Success;
+    }
+
+    /// <summary>
+    /// <c>sync --publish</c>: Postman first, local files second. The collection file and the baseline are written only after the collection in
+    /// Postman was verified, so a failed or rolled-back publish leaves the baseline as it was and the next run computes the same changes again.
+    /// </summary>
+    private static int SyncToPostman(
+        EndpointDiscoveryResult result, AnalysisSnapshot current, PostmanPublish.Settings postman, ChangeSet changes, SyncDecision decision,
+        string decisionReport, Dictionary<string, string> values, bool dryRun, bool autoRollback, CliEnvironment environment, TextWriter output, TextWriter error)
+    {
+        var collectionPath = values["--out"];
+        var baselinePath = values["--baseline"];
+        var name = values.GetValueOrDefault("--name", "API Collection");
+        var backupDirectory = values.GetValueOrDefault("--backup-dir")
+            ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(collectionPath)) ?? string.Empty, "backups");
+
+        var json = PostmanCollectionSerializer.Serialize(new PostmanCollectionGenerator().Generate(result.Endpoints, new PostmanCollectionOptions
+        {
+            Name = name,
+            BaseUrl = values.GetValueOrDefault("--base-url", "http://localhost:5000"),
+            IdNamespace = PostmanPublish.IdNamespace(postman.WorkspaceId, name)
+        }));
+        var newBaseline = AnalysisSnapshot.Create(result.Endpoints, SnapshotCollection.FromJson(collectionPath, json));
+
+        var sync = PostmanPublish.Run(postman, environment, name, json, changes, decision, backupDirectory, dryRun, autoRollback);
+        var text = sync.ToText();
+        output.WriteLine();
+        output.Write(text);
+
+        if (values.TryGetValue("--report", out var reportPath) && !TryWrite(reportPath, decisionReport + "\n" + text, error))
+        {
+            return Failure;
+        }
+
+        if (!sync.Succeeded)
+        {
+            return sync.NeedsAttention ? NeedsAttention : NotSynced;
+        }
+
+        if (sync.Outcome != PostmanSyncOutcome.Synced)
+        {
+            return Success; // no changes or a dry run: neither Postman nor the local files are touched
+        }
+
+        try
+        {
+            AtomicFileWriter.WriteAll([(collectionPath, json), (baselinePath, AnalysisSnapshotStore.Serialize(newBaseline))]);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            error.WriteLine(
+                $"The collection in Postman was updated and verified, but the local files could not be written: {exception.Message} " +
+                "The baseline is unchanged; running the sync again is safe and sends the same state.");
             return Failure;
         }
 
@@ -522,7 +622,7 @@ public static class CliApplication
         {
             "generate" => ["--strict"],
             "diff" => ["--exit-code"],
-            "sync" => ["--dry-run", "--allow-incomplete-discovery"],
+            "sync" => ["--dry-run", "--allow-incomplete-discovery", "--publish", "--no-rollback"],
             _ => []
         };
 
