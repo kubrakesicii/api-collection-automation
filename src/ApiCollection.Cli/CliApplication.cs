@@ -25,6 +25,9 @@ public static class CliApplication
     /// <summary>Returned by <c>sync</c> when the safety gate blocked it; nothing was written.</summary>
     public const int Blocked = 3;
 
+    /// <summary>Returned by <c>postman-check</c> when Postman could not be reached or refused the request.</summary>
+    public const int ConnectionFailed = 4;
+
     public const string Usage = """
         Usage:
           ApiCollection.Cli discover <api-source-directory> [--examples <example-metadata.json>]
@@ -37,7 +40,12 @@ public static class CliApplication
                                  [--examples <example-metadata.json>] [--name <collection-name>] [--base-url <url>]
                                  [--dry-run] [--max-removed <n>] [--max-removed-percent <0-100>] [--allow-incomplete-discovery]
                                  [--plan <plan.json>] [--changes <changes.json>] [--report <sync.txt>]
+          ApiCollection.Cli postman-check [--workspace <workspace-id>]
 
+        'postman-check' makes read-only requests (GET only) to the Postman API to verify the API key and, if a workspace id is
+          given, access to that workspace. The key is read only from the POSTMAN_API_KEY environment variable and
+          never from the command line. The workspace comes from --workspace or POSTMAN_WORKSPACE_ID.
+          Exit codes: 0 connected, 1 not configured, 4 Postman refused or could not be reached. The key is never printed.
         'discover' prints the discovery report. 'generate' builds a Postman Collection v2.1 file locally; nothing is sent to Postman.
         'diff' compares the current API with a baseline snapshot and prints what was added, modified, removed or unchanged.
         'sync' brings the stored collection and its baseline snapshot up to date, but only if the safety gate allows it: it blocks
@@ -64,8 +72,13 @@ public static class CliApplication
     private static readonly string[] SyncOptions =
         ["--examples", "--name", "--base-url", "--baseline", "--out", "--plan", "--changes", "--report", "--max-removed", "--max-removed-percent"];
 
-    public static int Run(string[] args, TextWriter output, TextWriter error)
+    public static int Run(string[] args, TextWriter output, TextWriter error, CliEnvironment? environment = null)
     {
+        if (args.Length > 0 && args[0] == "postman-check")
+        {
+            return PostmanCheckCommand.Run(args[1..], output, error, environment ?? CliEnvironment.Default);
+        }
+
         if (!TryParse(args, out var command, out var directory, out var values, out var flags)
             || (command == "diff" && !values.ContainsKey("--baseline"))
             || (command == "sync" && (!values.ContainsKey("--baseline") || !values.ContainsKey("--out"))))
