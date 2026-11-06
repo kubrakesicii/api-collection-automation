@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "summary": {
+    "added": 15,
+    "modified": 0,
+    "removed": 0,
+    "unchanged": 0,
+    "total": 15
+  },
+  "hasChanges": true,
+  "warnings": [],
+  "endpoints": [
+    {
+      "id": "DELETE /api/customers/{:int}",
+      "status": "Added",
+      "httpMethod": "DELETE",
+      "route": "api/Customers/{id:int}",
+      "controllerName": "Customers",
+      "actionName": "Delete",
+      "changes": []
+    },
+    {
+      "id": "DELETE /api/orders/{:int}",
+      "status": "Added",
+      "httpMethod": "DELETE",
+      "route": "api/Orders/{id:int}",
+      "controllerName": "Orders",
+      "actionName": "Delete",
+      "changes": []
+    },
+    {
+      "id": "DELETE /api/products/{:int}",
+      "status": "Added",
+      "httpMethod": "DELETE",
+      "route": "api/Products/{id:int}",
+      "controllerName": "Products",
+      "actionName": "Delete",
+      "changes": []
+    },
+    {
+      "id": "GET /api/customers",
+      "status": "Added",
+      "httpMethod": "GET",
+      "route": "api/Customers",
+      "controllerName": "Customers",
+      "actionName": "GetAll",
+      "changes": []
+    },
+    {
+      "id": "GET /api/customers/{:int}",
+      "status": "Added",
+      "httpMethod": "GET",
+      "route": "api/Customers/{id:int}",
+      "controllerName": "Customers",
+      "actionName": "GetById",
+      "changes": []
+    },
+    {
+      "id": "GET /api/orders",
+      "status": "Added",
+      "httpMethod": "GET",
+      "route": "api/Orders",
+      "controllerName": "Orders",
+      "actionName": "GetAll",
+      "changes": []
+    },
+    {
+      "id": "GET /api/orders/{:int}",
+      "status": "Added",
+      "httpMethod": "GET",
+      "route": "api/Orders/{id:int}",
+      "controllerName": "Orders",
+      "actionName": "GetById",
+      "changes": []
+    },
+    {
+      "id": "GET /api/products",
+      "status": "Added",
+      "httpMethod": "GET",
+      "route": "api/Products",
+      "controllerName": "Products",
+      "actionName": "GetAll",
+      "changes": []
+    },
+    {
+      "id": "GET /api/products/{:int}",
+      "status": "Added",
+      "httpMethod": "GET",
+      "route": "api/Products/{id:int}",
+      "controllerName": "Products",
+      "actionName": "GetById",
+      "changes": []
+    },
+    {
+      "id": "POST /api/customers",
+      "status": "Added",
+      "httpMethod": "POST",
+      "route": "api/Customers",
+      "controllerName": "Customers",
+      "actionName": "Create",
+      "changes": []
+    },
+    {
+      "id": "POST /api/orders",
+      "status": "Added",
+      "httpMethod": "POST",
+      "route": "api/Orders",
+      "controllerName": "Orders",
+      "actionName": "Create",
+      "changes": []
+    },
+    {
+      "id": "POST /api/products",
+      "status": "Added",
+      "httpMethod": "POST",
+      "route": "api/Products",
+      "controllerName": "Products",
+      "actionName": "Create",
+      "changes": []
+    },
+    {
+      "id": "PUT /api/customers/{:int}",
+      "status": "Added",
+      "httpMethod": "PUT",
+      "route": "api/Customers/{id:int}",
+      "controllerName": "Customers",
+      "actionName": "Update",
+      "changes": []
+    },
+    {
+      "id": "PUT /api/orders/{:int}",
+      "status": "Added",
+      "httpMethod": "PUT",
+      "route": "api/Orders/{id:int}",
+      "controllerName": "Orders",
+      "actionName": "Update",
+      "changes": []
+    },
+    {
+      "id": "PUT /api/products/{:int}",
+      "status": "Added",
+      "httpMethod": "PUT",
+      "route": "api/Products/{id:int}",
+      "controllerName": "Products",
+      "actionName": "Update",
+      "changes": []
+    }
+  ]
+}

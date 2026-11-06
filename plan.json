@@ -1,0 +1,109 @@
+{
+  "outcome": "Allowed",
+  "violations": [],
+  "notes": [],
+  "summary": {
+    "added": 15,
+    "modified": 0,
+    "removed": 0,
+    "unchanged": 0,
+    "total": 15
+  },
+  "plan": [
+    {
+      "action": "Create",
+      "id": "DELETE /api/customers/{:int}",
+      "controllerName": "Customers",
+      "actionName": "Delete"
+    },
+    {
+      "action": "Create",
+      "id": "DELETE /api/orders/{:int}",
+      "controllerName": "Orders",
+      "actionName": "Delete"
+    },
+    {
+      "action": "Create",
+      "id": "DELETE /api/products/{:int}",
+      "controllerName": "Products",
+      "actionName": "Delete"
+    },
+    {
+      "action": "Create",
+      "id": "GET /api/customers",
+      "controllerName": "Customers",
+      "actionName": "GetAll"
+    },
+    {
+      "action": "Create",
+      "id": "GET /api/customers/{:int}",
+      "controllerName": "Customers",
+      "actionName": "GetById"
+    },
+    {
+      "action": "Create",
+      "id": "GET /api/orders",
+      "controllerName": "Orders",
+      "actionName": "GetAll"
+    },
+    {
+      "action": "Create",
+      "id": "GET /api/orders/{:int}",
+      "controllerName": "Orders",
+      "actionName": "GetById"
+    },
+    {
+      "action": "Create",
+      "id": "GET /api/products",
+      "controllerName": "Products",
+      "actionName": "GetAll"
+    },
+    {
+      "action": "Create",
+      "id": "GET /api/products/{:int}",
+      "controllerName": "Products",
+      "actionName": "GetById"
+    },
+    {
+      "action": "Create",
+      "id": "POST /api/customers",
+      "controllerName": "Customers",
+      "actionName": "Create"
+    },
+    {
+      "action": "Create",
+      "id": "POST /api/orders",
+      "controllerName": "Orders",
+      "actionName": "Create"
+    },
+    {
+      "action": "Create",
+      "id": "POST /api/products",
+      "controllerName": "Products",
+      "actionName": "Create"
+    },
+    {
+      "action": "Create",
+      "id": "PUT /api/customers/{:int}",
+      "controllerName": "Customers",
+      "actionName": "Update"
+    },
+    {
+      "action": "Create",
+      "id": "PUT /api/orders/{:int}",
+      "controllerName": "Orders",
+      "actionName": "Update"
+    },
+    {
+      "action": "Create",
+      "id": "PUT /api/products/{:int}",
+      "controllerName": "Products",
+      "actionName": "Update"
+    }
+  ],
+  "limits": {
+    "maxRemovedPercent": 30,
+    "maxRemovedCount": 10,
+    "allowIncompleteDiscovery": false
+  }
+}
