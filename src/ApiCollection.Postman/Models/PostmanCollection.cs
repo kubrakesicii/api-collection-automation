@@ -34,6 +34,10 @@ public sealed class PostmanFolder
     [JsonPropertyName("name")]
     public required string Name { get; init; }
 
+    /// <summary>Stable id (see <see cref="Generation.DeterministicId"/>); only set when publishing, so Postman keeps the folder across updates.</summary>
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
+
     [JsonPropertyName("item")]
     public IReadOnlyList<PostmanRequestItem> Items { get; init; } = [];
 }
@@ -42,6 +46,10 @@ public sealed class PostmanRequestItem
 {
     [JsonPropertyName("name")]
     public required string Name { get; init; }
+
+    /// <summary>Stable id derived from the endpoint identity; only set when publishing, so Postman keeps the request across updates.</summary>
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
 
     [JsonPropertyName("request")]
     public required PostmanRequest Request { get; init; }

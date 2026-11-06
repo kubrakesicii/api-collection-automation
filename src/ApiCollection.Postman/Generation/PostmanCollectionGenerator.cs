@@ -13,6 +13,14 @@ public sealed record PostmanCollectionOptions
 
     /// <summary>Default value of the <c>baseUrl</c> collection variable (not a secret).</summary>
     public string BaseUrl { get; init; } = "http://localhost:5000";
+
+    /// <summary>
+    /// Set only when the collection is going to Postman Cloud. It switches on what a published collection needs:
+    /// stable ids for folders and requests (Postman otherwise recreates items under new ids on every update) and a marker variable that
+    /// proves the collection is maintained by this tool. Use a value that is unique per destination (for example the workspace id and the
+    /// collection name): the same ids in two collections could collide. Left null, the output is exactly what a local file needs.
+    /// </summary>
+    public string? IdNamespace { get; init; }
 }
 
 /// <summary>
@@ -24,14 +32,40 @@ public sealed partial class PostmanCollectionGenerator
     public const string BaseUrlVariable = "baseUrl";
     public const string TokenVariable = "token";
 
+    /// <summary>A collection variable that marks a collection as maintained by this tool; only a collection that has it may be adopted or overwritten.</summary>
+    public const string ManagedMarkerVariable = "automationManaged";
+
+    public const string ManagedMarkerValue = "api-collection-automation";
+
     public PostmanCollection Generate(IEnumerable<EndpointDefinition> endpoints, PostmanCollectionOptions? options = null)
     {
         options ??= new PostmanCollectionOptions();
+        var idNamespace = options.IdNamespace;
 
         var folders = endpoints
             .GroupBy(e => e.ControllerName)
-            .Select(group => new PostmanFolder { Name = group.Key, Items = BuildItems(group.ToList()) })
+            .Select(group => new PostmanFolder
+            {
+                Name = group.Key,
+                Id = idNamespace is null ? null : DeterministicId.For($"{idNamespace}|folder|{group.Key}"),
+                Items = BuildItems(group.ToList(), idNamespace)
+            })
             .ToList();
+
+        List<PostmanVariable> variables =
+        [
+            new PostmanVariable { Key = BaseUrlVariable, Value = options.BaseUrl, Description = "Base address of the API." },
+            new PostmanVariable { Key = TokenVariable, Value = string.Empty, Description = "Bearer token for protected endpoints. Never commit a real token." }
+        ];
+        if (idNamespace is not null)
+        {
+            variables.Add(new PostmanVariable
+            {
+                Key = ManagedMarkerVariable,
+                Value = ManagedMarkerValue,
+                Description = "Marks this collection as maintained by api-collection-automation. Keep it: it is how the tool recognises its own collection instead of creating a duplicate."
+            });
+        }
 
         return new PostmanCollection
         {
@@ -41,20 +75,18 @@ public sealed partial class PostmanCollectionGenerator
                 Description = $"Generated from endpoint metadata. Set the `{BaseUrlVariable}` variable and, for protected endpoints, the `{TokenVariable}` variable."
             },
             Items = folders,
-            Variables =
-            [
-                new PostmanVariable { Key = BaseUrlVariable, Value = options.BaseUrl, Description = "Base address of the API." },
-                new PostmanVariable { Key = TokenVariable, Value = string.Empty, Description = "Bearer token for protected endpoints. Never commit a real token." }
-            ]
+            Variables = variables
         };
     }
 
-    private static List<PostmanRequestItem> BuildItems(List<EndpointDefinition> endpoints)
+    private static List<PostmanRequestItem> BuildItems(List<EndpointDefinition> endpoints, string? idNamespace)
     {
         var duplicateNames = endpoints.GroupBy(e => e.ActionName).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
         return endpoints.Select(e => new PostmanRequestItem
         {
             Name = duplicateNames.Contains(e.ActionName) ? $"{e.ActionName} [{Method(e)} /{e.RouteTemplate}]" : e.ActionName,
+            // Derived from the endpoint identity (ADR 0001), so a request keeps its id however its action or controller is renamed.
+            Id = idNamespace is null ? null : DeterministicId.For($"{idNamespace}|request|{e.Id}"),
             Request = BuildRequest(e)
         }).ToList();
     }

@@ -1,8 +1,7 @@
-using System.Globalization;
 using System.Net;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using static ApiCollection.Postman.CloudApi.PostmanApiTransport;
 
 namespace ApiCollection.Postman.CloudApi;
 
@@ -13,9 +12,6 @@ namespace ApiCollection.Postman.CloudApi;
 /// </summary>
 public sealed partial class PostmanConnectionChecker(HttpClient http)
 {
-    private const int MaxBodyBytes = 64 * 1024;
-    private const int MaxMessageLength = 200;
-
     public async Task<PostmanConnectionResult> CheckAsync(PostmanConnectionOptions options, CancellationToken cancellationToken = default)
     {
         var apiKey = (options.ApiKey ?? string.Empty).Trim();
@@ -85,7 +81,7 @@ public sealed partial class PostmanConnectionChecker(HttpClient http)
             return Configuration(PostmanConnectionStatus.NotConfigured, "No Postman API key was provided. Nothing was sent.");
         }
 
-        if (apiKey.Any(c => char.IsWhiteSpace(c) || char.IsControl(c) || c > 126))
+        if (!IsPlausibleApiKey(apiKey))
         {
             return Configuration(
                 PostmanConnectionStatus.InvalidApiKey,
@@ -112,40 +108,23 @@ public sealed partial class PostmanConnectionChecker(HttpClient http)
 
     // ---- requests ----
 
-    private sealed record Reply(HttpStatusCode Status, string Body, TimeSpan? RetryAfter);
-
-    private async Task<(Reply? Reply, PostmanConnectionResult? Failure)> GetAsync(
+    private async Task<(PostmanReply? Reply, PostmanConnectionResult? Failure)> GetAsync(
         string path, PostmanConnectionStep step, string apiKey, PostmanConnectionOptions options, CancellationToken cancellationToken,
         string? workspaceId = null)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(options.BaseAddress, path));
-        request.Headers.TryAddWithoutValidation("X-API-Key", apiKey);
-        request.Headers.Accept.ParseAdd("application/json");
+        var (reply, failure) = await SendAsync(
+            http, HttpMethod.Get, new Uri(options.BaseAddress, path), apiKey, null, options.Timeout, SmallResponseBytes, cancellationToken);
 
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(options.Timeout);
-
-        Reply reply;
-        try
+        if (failure is not null)
         {
-            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-            reply = new Reply(response.StatusCode, await ReadBodyAsync(response, timeout.Token), RetryAfterOf(response));
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return (null, Failure(PostmanConnectionStatus.Timeout, step, null, $"Postman did not answer within {options.Timeout.TotalSeconds:0.#} seconds.", apiKey));
-        }
-        catch (HttpRequestException exception)
-        {
-            return (null, Failure(
-                PostmanConnectionStatus.NetworkError, step, null,
-                $"The request could not be completed ({exception.InnerException?.Message ?? exception.Message}). Check the network, proxy and TLS settings.", apiKey));
+            var status = failure.Kind == TransportFailureKind.Timeout ? PostmanConnectionStatus.Timeout : PostmanConnectionStatus.NetworkError;
+            return (null, Failure(status, step, null, failure.Message, apiKey));
         }
 
-        return reply.Status == HttpStatusCode.OK ? (reply, null) : (null, Classify(reply, step, apiKey, workspaceId));
+        return reply!.Status == HttpStatusCode.OK ? (reply, null) : (null, Classify(reply, step, apiKey, workspaceId));
     }
 
-    private static PostmanConnectionResult Classify(Reply reply, PostmanConnectionStep step, string apiKey, string? workspaceId)
+    private static PostmanConnectionResult Classify(PostmanReply reply, PostmanConnectionStep step, string apiKey, string? workspaceId)
     {
         var status = (int)reply.Status;
         var remote = RemoteMessage(reply.Body);
@@ -183,36 +162,6 @@ public sealed partial class PostmanConnectionChecker(HttpClient http)
 
     // ---- reading answers ----
 
-    private static async Task<string> ReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        var buffer = new byte[MaxBodyBytes];
-        var total = 0;
-        while (total < buffer.Length)
-        {
-            var read = await stream.ReadAsync(buffer.AsMemory(total), cancellationToken);
-            if (read == 0)
-            {
-                break;
-            }
-
-            total += read;
-        }
-
-        return Encoding.UTF8.GetString(buffer, 0, total);
-    }
-
-    private static TimeSpan? RetryAfterOf(HttpResponseMessage response)
-    {
-        var retry = response.Headers.RetryAfter;
-        if (retry?.Delta is { } delta)
-        {
-            return delta;
-        }
-
-        return retry?.Date is { } date && date > DateTimeOffset.UtcNow ? date - DateTimeOffset.UtcNow : null;
-    }
-
     /// <summary>
     /// A 200 answer must at least be a JSON object (anything else is a proxy or captive portal answering). The named section is
     /// optional: only the status code is relied upon, because the exact shape of the answer is not part of the contract we test.
@@ -238,57 +187,6 @@ public sealed partial class PostmanConnectionChecker(HttpClient http)
         }
     }
 
-    private static string? Text(JsonElement section, string name) =>
-        section.ValueKind == JsonValueKind.Object && section.TryGetProperty(name, out var value)
-            ? value.ValueKind switch
-            {
-                JsonValueKind.String => value.GetString(),
-                JsonValueKind.Number => value.GetRawText(),
-                _ => null
-            }
-            : null;
-
-    /// <summary>The message Postman put in an error body (<c>error.message</c>, <c>error.name</c> or SCIM's <c>detail</c>), if any.</summary>
-    private static string? RemoteMessage(string body)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(body);
-            var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object)
-            {
-                return null;
-            }
-
-            if (root.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object)
-            {
-                return Text(error, "message") ?? Text(error, "name");
-            }
-
-            return Text(root, "detail") ?? Text(root, "message");
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    /// <summary>Makes text safe to print: single line, no control characters, bounded, and never containing the API key.</summary>
-    private static string Clean(string text, string apiKey)
-    {
-        var cleaned = new string(text.Select(c => char.IsControl(c) ? ' ' : c).ToArray());
-        if (apiKey.Length > 0)
-        {
-            cleaned = cleaned.Replace(apiKey, "*****", StringComparison.Ordinal);
-        }
-
-        cleaned = Whitespace().Replace(cleaned, " ").Trim();
-        return cleaned.Length <= MaxMessageLength ? cleaned : cleaned[..(MaxMessageLength - 3)] + "...";
-    }
-
     [GeneratedRegex("^[A-Za-z0-9-]{1,64}$")]
     private static partial Regex WorkspaceIdPattern();
-
-    [GeneratedRegex(@"\s+")]
-    private static partial Regex Whitespace();
 }
