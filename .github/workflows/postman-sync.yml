@@ -1,0 +1,244 @@
+name: Postman sync
+
+# What runs:
+#   verify  (every push that touches the API or the tool): restore, build, test, analyze, diff, safety check. No secrets, no Postman.
+#   publish (only pushes to the repository's default branch, and only after verify passed): back up, publish, verify and, if needed,
+#           roll back the Postman collection. Needs the approval configured on the "postman" environment.
+# The sync state (snapshot + collection file the next run compares against) lives on the branch "postman-sync-state".
+
+on:
+  push:
+    paths:
+      - 'sample-api/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'config/**'
+      - 'global.json'
+      - 'Directory.Build.props'
+      - 'ApiCollection.sln'
+      - '.github/workflows/postman-sync.yml'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only plan: read from Postman, write nothing'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  API_DIRECTORY: sample-api/SampleApi
+  EXAMPLES_FILE: config/examples.sample-api.json
+  STATE_BRANCH: postman-sync-state
+
+jobs:
+  verify:
+    name: Build, test, analyze, diff and safety check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: postman-sync-verify-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore ApiCollection.sln
+
+      - name: Build
+        run: dotnet build ApiCollection.sln --no-restore -c Release
+
+      - name: Test
+        run: dotnet test ApiCollection.sln --no-build -c Release
+
+      # Fails (exit code 2) when discovery reported warnings: an analysis that may have missed endpoints must not reach Postman.
+      - name: Analyze the API
+        shell: bash
+        run: |
+          dotnet run --no-build -c Release --project src/ApiCollection.Cli -- generate "$API_DIRECTORY" \
+            --examples "$EXAMPLES_FILE" --strict \
+            --out "$RUNNER_TEMP/analysis/collection.json" --report "$RUNNER_TEMP/analysis/discovery.txt"
+
+      # Read-only: fetches the last published state, if there is one. A failure other than "branch not found" fails the job,
+      # so a network problem is never mistaken for a first sync (which has no deletion guard).
+      - name: Fetch the sync state
+        shell: bash
+        run: |
+          state="$RUNNER_TEMP/state"
+          set +e
+          git ls-remote --exit-code --heads origin "$STATE_BRANCH" > /dev/null
+          found=$?
+          set -e
+          if [ "$found" -eq 0 ]; then
+            git fetch --quiet --depth 1 origin "$STATE_BRANCH"
+            git worktree add --quiet --detach "$state" FETCH_HEAD
+          elif [ "$found" -eq 2 ]; then
+            mkdir -p "$state"
+            echo "There is no state branch yet: this will be a first sync."
+          else
+            echo "::error::Could not look up the state branch."
+            exit 1
+          fi
+
+      - name: Diff against the last published state
+        shell: bash
+        run: |
+          state="$RUNNER_TEMP/state"
+          if [ -f "$state/api.snapshot.json" ]; then
+            dotnet run --no-build -c Release --project src/ApiCollection.Cli -- diff "$API_DIRECTORY" \
+              --examples "$EXAMPLES_FILE" --baseline "$state/api.snapshot.json" \
+              --changes "$RUNNER_TEMP/analysis/changes.json" --report "$RUNNER_TEMP/analysis/diff.txt"
+          else
+            echo "No baseline yet: every endpoint counts as new."
+          fi
+
+      # The safety gate without --publish: it can block (exit code 3) but never contacts Postman and writes no state.
+      - name: Safety validation
+        shell: bash
+        run: |
+          state="$RUNNER_TEMP/state"
+          dotnet run --no-build -c Release --project src/ApiCollection.Cli -- sync "$API_DIRECTORY" \
+            --examples "$EXAMPLES_FILE" --name "Sample API" --dry-run \
+            --baseline "$state/api.snapshot.json" --out "$state/api.postman_collection.json" \
+            --plan "$RUNNER_TEMP/analysis/plan.json" --report "$RUNNER_TEMP/analysis/safety.txt"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          for file in safety diff; do
+            if [ -f "$RUNNER_TEMP/analysis/$file.txt" ]; then
+              { echo "### $file"; echo '```'; cat "$RUNNER_TEMP/analysis/$file.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+      - name: Upload analysis reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-reports
+          path: ${{ runner.temp }}/analysis/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  publish:
+    name: Publish to Postman
+    needs: verify
+    # Only the default branch publishes; a manual run from another branch is skipped.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: postman
+    permissions:
+      contents: write # only to update the state branch
+    # One writer at a time for the collection. A waiting run is not cancelled by a newer one starting; GitHub keeps only the newest
+    # waiting run, which is enough because every run compares the full source with the stored state.
+    concurrency:
+      group: postman-sync-publish
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build the CLI
+        run: |
+          dotnet restore src/ApiCollection.Cli
+          dotnet build src/ApiCollection.Cli --no-restore -c Release
+
+      - name: Fetch the sync state
+        shell: bash
+        run: |
+          state="$RUNNER_TEMP/state"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          set +e
+          git ls-remote --exit-code --heads origin "$STATE_BRANCH" > /dev/null
+          found=$?
+          set -e
+          if [ "$found" -eq 0 ]; then
+            git fetch --quiet --depth 1 origin "$STATE_BRANCH"
+            git worktree add --quiet --detach "$state" FETCH_HEAD
+          elif [ "$found" -eq 2 ]; then
+            # First run: start the state branch from an empty root commit.
+            root=$(git commit-tree "$(git hash-object -t tree /dev/null)" -m "Initialize Postman sync state")
+            git worktree add --quiet --detach "$state" "$root"
+          else
+            echo "::error::Could not look up the state branch."
+            exit 1
+          fi
+
+      # The key is read by the tool from POSTMAN_API_KEY; it is never put on a command line and never echoed.
+      - name: Sync with Postman
+        shell: bash
+        env:
+          POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+          POSTMAN_WORKSPACE_ID: ${{ vars.POSTMAN_WORKSPACE_ID }}
+          POSTMAN_COLLECTION_NAME: ${{ vars.POSTMAN_COLLECTION_NAME }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          for name in POSTMAN_API_KEY POSTMAN_WORKSPACE_ID POSTMAN_COLLECTION_NAME; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set on the 'postman' environment."
+              exit 1
+            fi
+          done
+
+          state="$RUNNER_TEMP/state"
+          flags=()
+          if [ "$DRY_RUN" = "true" ]; then
+            flags+=(--dry-run)
+          fi
+
+          dotnet run --no-build -c Release --project src/ApiCollection.Cli -- sync "$API_DIRECTORY" \
+            --examples "$EXAMPLES_FILE" --name "$POSTMAN_COLLECTION_NAME" --publish "${flags[@]}" \
+            --baseline "$state/api.snapshot.json" --out "$state/api.postman_collection.json" \
+            --backup-dir "$RUNNER_TEMP/postman-backups" \
+            --plan "$RUNNER_TEMP/postman-reports/plan.json" --changes "$RUNNER_TEMP/postman-reports/changes.json" \
+            --report "$RUNNER_TEMP/postman-reports/sync.txt"
+
+      # Runs only after a successful sync: the tool writes the snapshot and the collection file only after the publish was verified.
+      - name: Save the sync state
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/state"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "The sync state did not change."
+            exit 0
+          fi
+          git commit --quiet -m "Update Postman sync state for $GITHUB_SHA"
+          git push --quiet origin "HEAD:refs/heads/$STATE_BRANCH"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/postman-reports/sync.txt" ]; then
+            { echo '### Postman sync'; echo '```'; cat "$RUNNER_TEMP/postman-reports/sync.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Backups of the collection as it was in Postman before each update (secret-looking values are redacted).
+      - name: Upload backups and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postman-sync
+          path: |
+            ${{ runner.temp }}/postman-backups/
+            ${{ runner.temp }}/postman-reports/
+          if-no-files-found: ignore
+          retention-days: 30
