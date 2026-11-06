@@ -38,6 +38,9 @@ internal sealed class FakePostmanCloud : HttpMessageHandler
     /// <summary>Lets a test answer a call itself (to inject an error); return null to fall through to the normal behaviour.</summary>
     public Func<Call, HttpResponseMessage?>? Intercept { get; set; }
 
+    /// <summary>Runs after a call was handled normally (so a write has been applied); lets a test damage the stored state or lose the answer.</summary>
+    public Action<Call, HttpResponseMessage>? AfterRoute { get; set; }
+
     public IEnumerable<Call> Writes => Calls.Where(c => c.Method != HttpMethod.Get);
 
     public Stored Add(string workspaceId, string name, bool managed, string? id = null)
@@ -75,7 +78,9 @@ internal sealed class FakePostmanCloud : HttpMessageHandler
             return Task.FromResult(injected);
         }
 
-        return Task.FromResult(key != ApiKey ? Error(HttpStatusCode.Unauthorized, "AuthenticationError", "Invalid API Key. Every request requires a valid API Key to be sent.") : Route(request, call));
+        var response = key != ApiKey ? Error(HttpStatusCode.Unauthorized, "AuthenticationError", "Invalid API Key. Every request requires a valid API Key to be sent.") : Route(request, call);
+        AfterRoute?.Invoke(call, response);
+        return Task.FromResult(response);
     }
 
     private HttpResponseMessage Route(HttpRequestMessage request, Call call)
