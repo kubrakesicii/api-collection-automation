@@ -178,8 +178,9 @@ public sealed class SnapshotTests
     [Fact]
     public void Collection_reference_hashes_lf_normalized_text_and_keeps_only_the_file_name()
     {
-        var lf = SnapshotCollection.FromJson(@"C:\some\folder\sample.postman_collection.json", "{\n  \"a\": 1\n}");
-        var crlf = SnapshotCollection.FromJson("/other/place/sample.postman_collection.json", "{\r\n  \"a\": 1\r\n}");
+        // Paths are built with the platform's own separator: a backslash path is only a directory path on Windows.
+        var lf = SnapshotCollection.FromJson(Path.Combine("some", "folder", "sample.postman_collection.json"), "{\n  \"a\": 1\n}");
+        var crlf = SnapshotCollection.FromJson(Path.Combine(Path.DirectorySeparatorChar.ToString(), "other", "place", "sample.postman_collection.json"), "{\r\n  \"a\": 1\r\n}");
         var different = SnapshotCollection.FromJson("sample.postman_collection.json", "{\n  \"a\": 2\n}");
 
         Assert.Equal("sample.postman_collection.json", lf.FileName);
