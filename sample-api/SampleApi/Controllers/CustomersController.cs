@@ -13,6 +13,10 @@ public sealed class CustomersController(InMemoryStore<Customer> store) : Control
     public ActionResult<IEnumerable<CustomerResponse>> GetAll() =>
         Ok(store.GetAll().Select(ToResponse));
 
+    [HttpGet("{id:int}")]
+    public ActionResult<CustomerResponse> GetById(int id) =>
+        store.Get(id) is { } customer ? ToResponse(customer) : NotFound();
+
     [HttpDelete("{id:int}")]
     public IActionResult Delete(int id) => store.Remove(id) ? NoContent() : NotFound();
 
