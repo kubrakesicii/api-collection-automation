@@ -3,9 +3,55 @@
   "identityVersion": 1,
   "collection": {
     "fileName": "api.postman_collection.json",
-    "sha256": "54c3a7337e5407d36f6e4361a1c6fcab07286382c93bf782a6e65a3e4b61fbb4"
+    "sha256": "3e375e3ece33c6be28cba7593ecb8e0a473f2d30397aa57772648d6f3e79af90"
   },
   "endpoints": [
+    {
+      "id": "DELETE /api/customers/{:int}",
+      "fingerprint": "ba4a15b4f68b5d4d05cd4ce33c27a3ea794f94e9fc02838dbb290e8afe3af3de",
+      "httpMethod": "DELETE",
+      "route": "api/Customers/{id:int}",
+      "controllerName": "Customers",
+      "actionName": "Delete",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "Delete",
+        "endpoint.controller": "Customers",
+        "endpoint.route": "api/Customers/{id:int}",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int"
+      }
+    },
+    {
+      "id": "DELETE /api/products/{:int}",
+      "fingerprint": "7d463933b7072a7df7de8394531b1c3489aacb81ef7db89d238fe01467596281",
+      "httpMethod": "DELETE",
+      "route": "api/Products/{id:int}",
+      "controllerName": "Products",
+      "actionName": "Delete",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "Delete",
+        "endpoint.controller": "Products",
+        "endpoint.route": "api/Products/{id:int}",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int"
+      }
+    },
+    {
+      "id": "GET /api/customers",
+      "fingerprint": "4bfb43473cb377970bbd69274f5cde5a4bc10e378797b206adee40e52b9908f5",
+      "httpMethod": "GET",
+      "route": "api/Customers",
+      "controllerName": "Customers",
+      "actionName": "GetAll",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "GetAll",
+        "endpoint.controller": "Customers",
+        "endpoint.route": "api/Customers"
+      }
+    },
     {
       "id": "GET /api/customers/{:int}",
       "fingerprint": "060241cc48f408e68547bc0dc39a0597b02e3a26008ddc062e5baaa14de155e8",
@@ -23,8 +69,24 @@
       }
     },
     {
+      "id": "GET /api/orders/{:int}",
+      "fingerprint": "36f79c691167b4c5df0d97bdc2ec5472219e33978f9e202d0d7435336e8de3cd",
+      "httpMethod": "GET",
+      "route": "api/Orders/{id:int}",
+      "controllerName": "Orders",
+      "actionName": "GetById",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "GetById",
+        "endpoint.controller": "Orders",
+        "endpoint.route": "api/Orders/{id:int}",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int"
+      }
+    },
+    {
       "id": "POST /api/orders",
-      "fingerprint": "9769c819d31351ab5dd0a2f1333a87fe82d0e522a7913a5f85066179a6288b07",
+      "fingerprint": "a7affd540726dd23370055da5108b1eb566a0ecb333dcf2d0304bf1d5c802b66",
       "httpMethod": "POST",
       "route": "api/Orders",
       "controllerName": "Orders",
@@ -32,12 +94,15 @@
       "contract": {
         "auth.required": "false",
         "body.contentType": "application/json",
-        "body.example": "{\"customerId\":1,\"productId\":1,\"quantity\":2}",
+        "body.example": "{\"customerId\":1,\"productId\":1,\"quantity\":2,\"note\":\"Please deliver after 5 pm\"}",
         "body.exampleComplete": "true",
-        "body.propertyOrder[].names": "CustomerId,ProductId,Quantity",
+        "body.propertyOrder[].names": "CustomerId,ProductId,Quantity,Note",
         "body.property[CustomerId].nullable": "false",
         "body.property[CustomerId].required": "false",
         "body.property[CustomerId].type": "int",
+        "body.property[Note].nullable": "true",
+        "body.property[Note].required": "false",
+        "body.property[Note].type": "string?",
         "body.property[ProductId].nullable": "false",
         "body.property[ProductId].required": "false",
         "body.property[ProductId].type": "int",

@@ -7,11 +7,31 @@
   "item": [
     {
       "name": "Customers",
-      "id": "5e597186-94c7-59fa-a9e8-9f43ee54a520",
+      "id": "1450f671-3760-5b75-855e-296f9616d96c",
       "item": [
         {
+          "name": "GetAll",
+          "id": "30e2e699-0eaa-55ee-a67b-838ef8a0da75",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Customers"
+              ]
+            },
+            "description": "**GET** `/api/Customers`\n\nController: `Customers` · Action: `GetAll`"
+          },
+          "response": []
+        },
+        {
           "name": "GetById",
-          "id": "19c9b579-597d-578e-a708-f061ab9cf371",
+          "id": "b7acddad-6706-568d-a72c-c5a868f1a015",
           "request": {
             "method": "GET",
             "header": [],
@@ -36,16 +56,44 @@
             "description": "**GET** `/api/Customers/{id:int}`\n\nController: `Customers` · Action: `GetById`\n\nParameters:\n- `id` (path): int, required"
           },
           "response": []
+        },
+        {
+          "name": "Delete",
+          "id": "822ed8ad-afcc-5f73-9348-e1b76bf1fe0e",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Customers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Customers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "description": "**DELETE** `/api/Customers/{id:int}`\n\nController: `Customers` · Action: `Delete`\n\nParameters:\n- `id` (path): int, required"
+          },
+          "response": []
         }
       ]
     },
     {
       "name": "Orders",
-      "id": "a1c7b99d-5e98-561b-9416-a9c54f101ff5",
+      "id": "029d9d34-dffd-5f28-91bd-395e8cb7cd9e",
       "item": [
         {
           "name": "Create",
-          "id": "55e8fdec-4930-589c-95e8-213efd1c030e",
+          "id": "8c1bafb6-e243-546f-95f7-4aee2d7dc421",
           "request": {
             "method": "POST",
             "header": [
@@ -67,14 +115,42 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"customerId\": 1,\n  \"productId\": 1,\n  \"quantity\": 2\n}",
+              "raw": "{\n  \"customerId\": 1,\n  \"productId\": 1,\n  \"quantity\": 2,\n  \"note\": \"Please deliver after 5 pm\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "**POST** `/api/Orders`\n\nController: `Orders` · Action: `Create`\n\nBody example (complete); sources:\n- `CustomerId`: ExternalMetadata (examples.sample-api.json: properties[CreateOrderRequest.CustomerId])\n- `ProductId`: ExternalMetadata (examples.sample-api.json: properties[CreateOrderRequest.ProductId])\n- `Quantity`: ExternalMetadata (examples.sample-api.json: properties[CreateOrderRequest.Quantity])"
+            "description": "**POST** `/api/Orders`\n\nController: `Orders` · Action: `Create`\n\nBody example (complete); sources:\n- `CustomerId`: ExternalMetadata (examples.sample-api.json: properties[CreateOrderRequest.CustomerId])\n- `ProductId`: ExternalMetadata (examples.sample-api.json: properties[CreateOrderRequest.ProductId])\n- `Quantity`: ExternalMetadata (examples.sample-api.json: properties[CreateOrderRequest.Quantity])\n- `Note`: ExternalMetadata (examples.sample-api.json: properties[CreateOrderRequest.Note])"
+          },
+          "response": []
+        },
+        {
+          "name": "GetById",
+          "id": "cdea111d-762e-500f-b5f1-c9998342b219",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Orders/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Orders",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "description": "**GET** `/api/Orders/{id:int}`\n\nController: `Orders` · Action: `GetById`\n\nParameters:\n- `id` (path): int, required"
           },
           "response": []
         }
@@ -82,11 +158,11 @@
     },
     {
       "name": "Products",
-      "id": "b5b2b2c0-ffa2-5e37-be32-2b4ad952ac0c",
+      "id": "5a13b8c3-d58e-5ba9-9527-e21b3e86ffdf",
       "item": [
         {
           "name": "Update",
-          "id": "845cdb53-69b2-5fca-a5e6-09b6b9dfab9d",
+          "id": "126836c6-14cd-5792-b6f8-c6b0e866c9b8",
           "request": {
             "method": "PUT",
             "header": [
@@ -124,6 +200,34 @@
               }
             },
             "description": "**PUT** `/api/Products/{id:int}`\n\nController: `Products` · Action: `Update`\n\nParameters:\n- `id` (path): int, required\n\nBody example (complete); sources:\n- `Name`: ExternalMetadata (examples.sample-api.json: properties[UpdateProductRequest.Name])\n- `Price`: ExternalMetadata (examples.sample-api.json: properties[UpdateProductRequest.Price])"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete",
+          "id": "c33af429-c5c7-58d4-a65e-6b6c8500a426",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "description": "**DELETE** `/api/Products/{id:int}`\n\nController: `Products` · Action: `Delete`\n\nParameters:\n- `id` (path): int, required"
           },
           "response": []
         }
