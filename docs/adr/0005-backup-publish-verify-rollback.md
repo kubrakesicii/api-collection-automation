@@ -41,7 +41,11 @@ Geri alma da başarısız olabilir; bu durum gizlenmez, raporlanır.
   fakat güncellemeleri engelleyebilir. Gerçek Postman ile doğrulanmadı; ilk gerçek yayında rapor incelenmelidir.
 - **Koleksiyon değişkenleri**: `PUT` değişkenleri de değiştirir; kullanıcının elle girdiği `token`/`baseUrl` değerleri üretilen varsayılanlarla
   değişir. Sır olanlar yedekte redakte olduğundan dosyadan tam geri yüklenemez.
-- Postman'ın item id'lerimizi korumasına, uid/id kullanımına ve yazma yetkisine ait varsayımlar sahada doğrulanmadı.
+- **Item id'leri karşılaştırılmaz (2026-11-11 düzeltmesi).** İlk gerçek yayında Postman, gönderdiğimiz klasör ve request id'lerini korumadı ve kendi
+  id'lerini atadı; id'ye göre eşleyen doğrulama doğru koleksiyonu "60 fark" diye reddetti. `CollectionProjection` artık öğeleri bulundukları yere
+  göre (`Klasör/Request`; aynı adlı kardeşler sırayla `Ad`, `Ad#2`) eşler. Gerçek bir kayıp, yeniden adlandırma ya da içerik farkı yine yakalanır
+  (yeniden adlandırma eski yerde `missing`, yenisinde `unexpected` olarak görünür). Sahte Postman, id'leri değiştiren davranışı taklit eder.
+- Postman'ın `PUT` ile id'leri korumasına ve yazma yetkisine ait varsayımlar sahada doğrulanmadı.
 - Yarış: yedek ile yazma arasında başkası koleksiyonu değiştirirse bu fark edilmez (kilit yok).
 - CLI `publish` komutu ve uid'nin snapshot'ta saklanması bu task'ta yok; gerçek Postman'a yazma ayrıca açık onay gerektirir.
 

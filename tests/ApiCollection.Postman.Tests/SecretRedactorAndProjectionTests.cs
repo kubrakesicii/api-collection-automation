@@ -116,7 +116,7 @@ public sealed class SecretRedactorAndProjectionTests
 
         var differences = CollectionProjection.Differences(CollectionProjection.Of(WithSecrets), CollectionProjection.Of(json));
 
-        Assert.Equal(["changed request[root/Folder/Request].headers", "changed variable[dbPassword]", "changed variable[token]"], differences);
+        Assert.Equal(["changed request[Folder/Request].headers", "changed variable[dbPassword]", "changed variable[token]"], differences);
     }
 
     // ---- projection ----
@@ -142,23 +142,49 @@ public sealed class SecretRedactorAndProjectionTests
         """;
 
     [Fact]
-    public void Facts_describe_names_methods_urls_bodies_headers_and_auth_keyed_by_item_id()
+    public void Facts_describe_names_methods_urls_bodies_headers_and_auth_keyed_by_where_the_item_sits()
     {
         var facts = CollectionProjection.Of(Remote);
 
         Assert.Equal("Api", facts["collection.name"]);
         Assert.Equal("About", facts["collection.description"]);
         Assert.Equal("http://localhost:5000", facts["variable[baseUrl]"]);
-        Assert.Equal("Items", facts["folder[f1].name"]);
-        Assert.Equal("f1", facts["request[r1].parent"]);
-        Assert.Equal("GET", facts["request[r1].method"]);
-        Assert.Equal("{{baseUrl}}/api/items", facts["request[r1].url"]);
-        Assert.Equal("Lists items.", facts["request[r1].description"]);
-        Assert.Equal("A=1|disabled;B=2", facts["request[r1].headers"]);
-        Assert.Equal("bearer", facts["request[r1].auth"]);
-        Assert.Equal("{{token}}", facts["request[r1].authToken"]);
-        Assert.Equal("{{baseUrl}}/api/items", facts["request[r2].url"]);
-        Assert.Equal("{\n  \"a\": 1\n}", facts["request[r2].body"]);
+        Assert.Equal("Items", facts["folder[Items].name"]);
+        Assert.Equal("Items", facts["request[Items/List].parent"]);
+        Assert.Equal("GET", facts["request[Items/List].method"]);
+        Assert.Equal("{{baseUrl}}/api/items", facts["request[Items/List].url"]);
+        Assert.Equal("Lists items.", facts["request[Items/List].description"]);
+        Assert.Equal("A=1|disabled;B=2", facts["request[Items/List].headers"]);
+        Assert.Equal("bearer", facts["request[Items/List].auth"]);
+        Assert.Equal("{{token}}", facts["request[Items/List].authToken"]);
+        Assert.Equal("{{baseUrl}}/api/items", facts["request[Items/Create].url"]);
+        Assert.Equal("{\n  \"a\": 1\n}", facts["request[Items/Create].body"]);
+        Assert.DoesNotContain(facts.Keys, key => key.Contains("f1") || key.Contains("r1") || key.Contains("r2"));
+    }
+
+    [Fact]
+    public void Item_ids_are_not_compared_because_postman_assigns_its_own()
+    {
+        // The same collection as Remote, but every folder and request carries a different id (what Postman does when it creates a collection).
+        var reassigned = Remote.Replace("\"id\": \"f1\"", "\"id\": \"x-folder\"").Replace("\"id\": \"r1\"", "\"id\": \"x-1\"")
+            .Replace("\"id\": \"r2\"", "\"id\": \"x-2\"").Replace("\"uid\": \"1-f1\"", "\"uid\": \"9-x\"");
+
+        Assert.Empty(CollectionProjection.Differences(CollectionProjection.Of(Remote), CollectionProjection.Of(reassigned)));
+    }
+
+    [Fact]
+    public void Siblings_with_the_same_name_are_told_apart_by_their_order()
+    {
+        const string twins = """
+            { "info": { "name": "x" }, "item": [ { "name": "F", "item": [
+              { "name": "Get", "request": { "method": "GET", "url": "a" } },
+              { "name": "Get", "request": { "method": "POST", "url": "b" } } ] } ] }
+            """;
+
+        var facts = CollectionProjection.Of(twins);
+
+        Assert.Equal("GET", facts["request[F/Get].method"]);
+        Assert.Equal("POST", facts["request[F/Get#2].method"]);
     }
 
     [Fact]
@@ -194,9 +220,12 @@ public sealed class SecretRedactorAndProjectionTests
 
         var differences = CollectionProjection.Differences(CollectionProjection.Of(Remote), CollectionProjection.Of(actual));
 
-        Assert.Equal(
-            ["changed request[r1].method", "changed request[r2].name", "changed variable[baseUrl]", "unexpected variable[extra]"],
-            differences);
+        // Renaming a request is a removal and an addition at the level of paths: the old place is missing, the new one unexpected.
+        Assert.Contains("changed request[Items/List].method", differences);
+        Assert.Contains("missing request[Items/Create].name", differences);
+        Assert.Contains("unexpected request[Items/Make].name", differences);
+        Assert.Contains("changed variable[baseUrl]", differences);
+        Assert.Contains("unexpected variable[extra]", differences);
         Assert.All(differences, d => Assert.DoesNotContain("secret-host", d));
         Assert.DoesNotContain(differences, d => d.Contains("DELETE"));
     }
@@ -209,9 +238,9 @@ public sealed class SecretRedactorAndProjectionTests
 
         var differences = CollectionProjection.Differences(CollectionProjection.Of(Remote), CollectionProjection.Of(without.ToJsonString()));
 
-        Assert.Contains("missing request[r2].method", differences);
-        Assert.Contains("missing request[r2].name", differences);
-        Assert.All(differences, d => Assert.StartsWith("missing request[r2].", d));
+        Assert.Contains("missing request[Items/Create].method", differences);
+        Assert.Contains("missing request[Items/Create].name", differences);
+        Assert.All(differences, d => Assert.StartsWith("missing request[Items/Create].", d));
     }
 
     [Fact]
@@ -223,7 +252,7 @@ public sealed class SecretRedactorAndProjectionTests
 
         var facts = CollectionProjection.Of(noIds);
 
-        Assert.Equal("GET", facts["request[root/F/R].method"]);
-        Assert.Equal("u", facts["request[root/F/R].url"]);
+        Assert.Equal("GET", facts["request[F/R].method"]);
+        Assert.Equal("u", facts["request[F/R].url"]);
     }
 }

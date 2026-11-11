@@ -28,8 +28,8 @@ public sealed class CommittedSnapshotTests
 
     private static EndpointDiscoveryResult Analyse()
     {
-        var metadata = ExampleMetadataLoader.Load(Path.Combine(Root, "config", "examples.sample-api.json"));
-        return new EndpointDiscoveryEngine().DiscoverFromDirectory(Path.Combine(Root, "sample-api", "SampleApi"), metadata);
+        var metadata = ExampleMetadataLoader.Load(Path.Combine(Root, "fixtures", "examples", "examples.sample-api.json"));
+        return new EndpointDiscoveryEngine().DiscoverFromDirectory(Path.Combine(Root, "fixtures", "SampleApi"), metadata);
     }
 
     [Fact]

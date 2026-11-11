@@ -3,9 +3,11 @@ using System.Text.Json.Nodes;
 namespace ApiCollection.Postman.Sync;
 
 /// <summary>
-/// What matters about a collection, as plain facts keyed by item id, so that what we meant to publish can be compared with what Postman
-/// holds afterwards even though Postman adds fields of its own (timestamps, uids, owners). Differences are reported by fact path and kind
-/// only, never with values: a value may be a secret.
+/// What matters about a collection, as plain facts keyed by where an item sits (folder name, request name), so that what we meant to
+/// publish can be compared with what Postman holds afterwards even though Postman adds fields of its own (timestamps, uids, owners).
+/// Item ids are deliberately NOT part of the comparison: Postman assigns its own ids when it creates a collection and does not keep the
+/// ones we send (observed against the real service), so comparing by id would report a correct collection as different.
+/// Differences are reported by fact path and kind only, never with values: a value may be a secret.
 /// </summary>
 public static class CollectionProjection
 {
@@ -27,19 +29,28 @@ public static class CollectionProjection
             facts[$"variable[{Text(variable["key"])}]"] = Normalise(Text(variable["value"]));
         }
 
-        foreach (var item in (collection["item"] as JsonArray ?? []).OfType<JsonObject>())
-        {
-            AddItem(item, null, facts);
-        }
-
+        AddItems(collection["item"] as JsonArray ?? [], null, facts);
         return facts;
     }
 
-    private static void AddItem(JsonObject item, string? parentKey, SortedDictionary<string, string> facts)
+    /// <summary>
+    /// An item is identified by its path (<c>Folder/Request</c>). Siblings that share a name are told apart by their order
+    /// (<c>Name</c>, <c>Name#2</c>, ...), which Postman keeps.
+    /// </summary>
+    private static void AddItems(JsonArray items, string? parentKey, SortedDictionary<string, string> facts)
     {
-        var name = Text(item["name"]);
-        var key = Text(item["id"]) is { Length: > 0 } id ? id : $"{parentKey ?? "root"}/{name}";
+        var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var item in items.OfType<JsonObject>())
+        {
+            var name = Text(item["name"]);
+            var occurrence = seen[name] = seen.GetValueOrDefault(name) + 1;
+            var local = occurrence == 1 ? name : $"{name}#{occurrence}";
+            AddItem(item, name, parentKey is null ? local : $"{parentKey}/{local}", parentKey, facts);
+        }
+    }
 
+    private static void AddItem(JsonObject item, string name, string key, string? parentKey, SortedDictionary<string, string> facts)
+    {
         if (item["item"] is JsonArray children)
         {
             facts[$"folder[{key}].name"] = Normalise(name);
@@ -48,11 +59,7 @@ public static class CollectionProjection
                 facts[$"folder[{key}].parent"] = parentKey;
             }
 
-            foreach (var child in children.OfType<JsonObject>())
-            {
-                AddItem(child, key, facts);
-            }
-
+            AddItems(children, key, facts);
             return;
         }
 

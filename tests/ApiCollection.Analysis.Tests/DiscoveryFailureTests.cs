@@ -37,7 +37,7 @@ public sealed class DiscoveryFailureTests
             directory = directory.Parent;
         }
 
-        var result = Engine.DiscoverFromDirectory(Path.Combine(directory!.FullName, "sample-api", "SampleApi"));
+        var result = Engine.DiscoverFromDirectory(Path.Combine(directory!.FullName, "fixtures", "SampleApi"));
 
         Assert.Equal(15, result.Endpoints.Count);
         Assert.Empty(result.Failures);

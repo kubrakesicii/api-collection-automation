@@ -41,6 +41,12 @@ internal sealed class FakePostmanCloud : HttpMessageHandler
     /// <summary>Runs after a call was handled normally (so a write has been applied); lets a test damage the stored state or lose the answer.</summary>
     public Action<Call, HttpResponseMessage>? AfterRoute { get; set; }
 
+    /// <summary>
+    /// Behaves like the real service did when a collection was created: every folder and request gets an id of Postman's own, whatever ids
+    /// were sent (observed on 2026-11-11).
+    /// </summary>
+    public bool ReplaceItemIds { get; set; }
+
     public IEnumerable<Call> Writes => Calls.Where(c => c.Method != HttpMethod.Get);
 
     public Stored Add(string workspaceId, string name, bool managed, string? id = null)
@@ -175,7 +181,7 @@ internal sealed class FakePostmanCloud : HttpMessageHandler
     private JsonObject Normalise(string body, Stored? existing)
     {
         var collection = (JsonObject)JsonNode.Parse(body)!["collection"]!.DeepClone();
-        AssignIds(collection["item"]!.AsArray());
+        AssignIds(collection["item"]!.AsArray(), ReplaceItemIds);
         if (existing is not null)
         {
             ((JsonObject)collection["info"]!)["_postman_id"] = existing.Id;
@@ -184,14 +190,18 @@ internal sealed class FakePostmanCloud : HttpMessageHandler
         return collection;
     }
 
-    private void AssignIds(JsonArray items)
+    private void AssignIds(JsonArray items, bool replace)
     {
         foreach (var item in items.OfType<JsonObject>())
         {
-            item["id"] ??= $"fresh-{Guid.NewGuid()}";
+            if (replace || item["id"] is null)
+            {
+                item["id"] = $"fresh-{Guid.NewGuid()}";
+            }
+
             if (item["item"] is JsonArray children)
             {
-                AssignIds(children);
+                AssignIds(children, replace);
             }
         }
     }

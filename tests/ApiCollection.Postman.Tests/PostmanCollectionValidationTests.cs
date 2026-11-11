@@ -30,7 +30,7 @@ public sealed partial class PostmanCollectionValidationTests
         return directory?.FullName ?? throw new InvalidOperationException("ApiCollection.sln was not found above the test directory.");
     }
 
-    private static string SampleApi => Path.Combine(Root, "sample-api", "SampleApi");
+    private static string SampleApi => Path.Combine(Root, "fixtures", "SampleApi");
 
     private static string SecureApi => Path.Combine(Root, "fixtures", "SecureApi");
 
@@ -38,7 +38,7 @@ public sealed partial class PostmanCollectionValidationTests
 
     private static string SampleCollection(bool withExamples = true)
     {
-        var metadata = withExamples ? ExampleMetadataLoader.Load(Path.Combine(Root, "config", "examples.sample-api.json")) : null;
+        var metadata = withExamples ? ExampleMetadataLoader.Load(Path.Combine(Root, "fixtures", "examples", "examples.sample-api.json")) : null;
         var discovery = new EndpointDiscoveryEngine().DiscoverFromDirectory(SampleApi, metadata);
         return PostmanCollectionSerializer.Serialize(new PostmanCollectionGenerator().Generate(discovery.Endpoints, new PostmanCollectionOptions { Name = "Sample API" }));
     }

@@ -57,7 +57,7 @@ public sealed class ExampleMetadataTests
     public void Sample_api_examples_come_only_from_the_curated_metadata_file()
     {
         var root = RepositoryRoot();
-        var sampleApi = Path.Combine(root, "sample-api", "SampleApi");
+        var sampleApi = Path.Combine(root, "fixtures", "SampleApi");
         var engine = new EndpointDiscoveryEngine();
 
         // Without metadata nothing may be invented: the sample DTOs carry no static examples.
@@ -72,7 +72,7 @@ public sealed class ExampleMetadataTests
             bare.ExampleDiagnostics.Count(d => d.Code == "EX001"));
         Assert.Equal(6, bare.Endpoints.Count(e => e.RequestBody is not null));
 
-        var metadata = ExampleMetadataLoader.Load(Path.Combine(root, "config", "examples.sample-api.json"));
+        var metadata = ExampleMetadataLoader.Load(Path.Combine(root, "fixtures", "examples", "examples.sample-api.json"));
         var result = engine.DiscoverFromDirectory(sampleApi, metadata);
 
         var create = result.Endpoints.Single(e => e.ControllerName == "Products" && e.ActionName == "Create");

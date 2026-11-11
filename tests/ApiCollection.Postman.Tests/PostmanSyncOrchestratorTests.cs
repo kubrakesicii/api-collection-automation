@@ -152,6 +152,41 @@ public sealed class PostmanSyncOrchestratorTests
 
     private static SyncStepStatus Status(PostmanSyncReport report, SyncStepName name) => report.Steps.Single(s => s.Name == name).Status;
 
+    // ---- postman assigns its own item ids (observed on the real service) ----
+
+    [Fact]
+    public async Task A_new_collection_verifies_although_postman_replaced_every_folder_and_request_id()
+    {
+        var fake = Healthy();
+        fake.ReplaceItemIds = true;
+
+        var report = await Orchestrator(fake, new InMemoryBackupStore(fake)).SyncAsync(Request(Prepare([], V1)));
+
+        Assert.Equal((PostmanSyncOutcome.Synced, RemoteState.Published), (report.Outcome, report.RemoteState));
+        Assert.Empty(report.Mismatches);
+        var ids = FakePostmanCloud.ItemIds(fake.Collections[0]).Values;
+        Assert.All(ids, id => Assert.StartsWith("fresh-", id));
+    }
+
+    [Fact]
+    public async Task An_update_verifies_although_postman_replaced_the_ids_and_a_real_loss_is_still_caught_and_rolled_back()
+    {
+        var fake = Healthy();
+        fake.ReplaceItemIds = true;
+        var store = new InMemoryBackupStore(fake);
+        var uid = await Seed(fake, store);
+
+        var updated = await Orchestrator(fake, store).SyncAsync(Request(Prepare(V1, V2), known: uid));
+        Assert.Equal((PostmanSyncOutcome.Synced, RemoteState.Published), (updated.Outcome, updated.RemoteState));
+
+        var before = Project(fake);
+        CorruptNextPut(fake);
+        var broken = await Orchestrator(fake, store).SyncAsync(Request(Prepare(V2, V1), known: uid));
+
+        Assert.Equal((PostmanSyncOutcome.RolledBack, RemoteState.Restored), (broken.Outcome, broken.RemoteState));
+        Assert.Empty(CollectionProjection.Differences(before, Project(fake)));
+    }
+
     // ---- the collection does not exist yet ----
 
     [Fact]

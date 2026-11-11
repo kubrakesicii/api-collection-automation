@@ -24,8 +24,8 @@ public sealed class SampleApiCollectionTests
     public void Every_sample_api_endpoint_is_generated_in_its_controller_folder_with_correct_http_info()
     {
         var root = RepositoryRoot();
-        var metadata = ExampleMetadataLoader.Load(Path.Combine(root, "config", "examples.sample-api.json"));
-        var discovery = new EndpointDiscoveryEngine().DiscoverFromDirectory(Path.Combine(root, "sample-api", "SampleApi"), metadata);
+        var metadata = ExampleMetadataLoader.Load(Path.Combine(root, "fixtures", "examples", "examples.sample-api.json"));
+        var discovery = new EndpointDiscoveryEngine().DiscoverFromDirectory(Path.Combine(root, "fixtures", "SampleApi"), metadata);
 
         var json = PostmanCollectionSerializer.Serialize(new PostmanCollectionGenerator().Generate(discovery.Endpoints));
 
@@ -59,8 +59,8 @@ public sealed class SampleApiCollectionTests
     public void Sample_api_bodies_use_curated_examples_and_no_token_value_is_written()
     {
         var root = RepositoryRoot();
-        var metadata = ExampleMetadataLoader.Load(Path.Combine(root, "config", "examples.sample-api.json"));
-        var discovery = new EndpointDiscoveryEngine().DiscoverFromDirectory(Path.Combine(root, "sample-api", "SampleApi"), metadata);
+        var metadata = ExampleMetadataLoader.Load(Path.Combine(root, "fixtures", "examples", "examples.sample-api.json"));
+        var discovery = new EndpointDiscoveryEngine().DiscoverFromDirectory(Path.Combine(root, "fixtures", "SampleApi"), metadata);
 
         var collection = new PostmanCollectionGenerator().Generate(discovery.Endpoints);
         var create = collection.Items.Single(f => f.Name == "Products").Items.Single(i => i.Name == "Create").Request;
@@ -71,7 +71,7 @@ public sealed class SampleApiCollectionTests
         Assert.Empty(collection.Items.SelectMany(f => f.Items).SelectMany(i => i.Response));
 
         // Without curated examples nothing is invented: bodies fall back to labelled placeholder skeletons.
-        var bare = new PostmanCollectionGenerator().Generate(new EndpointDiscoveryEngine().DiscoverFromDirectory(Path.Combine(root, "sample-api", "SampleApi")).Endpoints);
+        var bare = new PostmanCollectionGenerator().Generate(new EndpointDiscoveryEngine().DiscoverFromDirectory(Path.Combine(root, "fixtures", "SampleApi")).Endpoints);
         var skeleton = bare.Items.Single(f => f.Name == "Products").Items.Single(i => i.Name == "Create").Request;
         Assert.Contains("<string>", skeleton.Body!.Raw);
         Assert.Contains("placeholders, not real examples", skeleton.Description);

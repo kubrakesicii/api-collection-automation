@@ -14,7 +14,7 @@ public sealed class SampleApiDiscoveryTests
         }
 
         Assert.NotNull(directory);
-        return Path.Combine(directory.FullName, "sample-api", "SampleApi");
+        return Path.Combine(directory.FullName, "fixtures", "SampleApi");
     }
 
     [Fact]

@@ -24,9 +24,9 @@ public sealed class CliApplicationTests : IDisposable
         return directory.FullName;
     }
 
-    private static string SampleApi => Path.Combine(RepositoryRoot(), "sample-api", "SampleApi");
+    private static string SampleApi => Path.Combine(RepositoryRoot(), "fixtures", "SampleApi");
 
-    private static string Examples => Path.Combine(RepositoryRoot(), "config", "examples.sample-api.json");
+    private static string Examples => Path.Combine(RepositoryRoot(), "fixtures", "examples", "examples.sample-api.json");
 
     private string InWork(string name) => Path.Combine(_work, name);
 

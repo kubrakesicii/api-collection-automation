@@ -130,7 +130,7 @@ public sealed class EndpointIdentityStabilityTests
             directory = directory.Parent;
         }
 
-        return Path.Combine(directory!.FullName, "sample-api", "SampleApi");
+        return Path.Combine(directory!.FullName, "fixtures", "SampleApi");
     }
 
     // ---- refactors that keep the identity ----

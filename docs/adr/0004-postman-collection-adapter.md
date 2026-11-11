@@ -25,8 +25,10 @@ her belirsizlik yazmadan durmayla çözülür (fail-closed).
 ## Doğrulanamayanlar (varsayım; ilk gerçek çalıştırmada görülecek)
 
 - `{collectionId}` yolunda `id` mı `uid` mi beklendiği belgede yazmıyor. Biz create yanıtındaki **`uid`**'yi saklar ve kullanırız.
-- Postman'ın bizim ürettiğimiz item `id`'lerini (UUIDv5) olduğu gibi kabul edip koruduğu. Belge "gönderilirse korunur" der; bizim değerlerimizin
-  kabul edildiği gerçek bir çalıştırmayla doğrulanmadı.
+- ~~Postman'ın bizim ürettiğimiz item `id`'lerini (UUIDv5) olduğu gibi kabul edip koruduğu.~~ **Gerçek çalıştırmada çürütüldü (2026-11-11):**
+  `POST /collections` ile oluşturulan koleksiyonda her klasör ve request'e Postman kendi rastgele (v4) id'sini atadı; gönderdiğimiz
+  UUIDv5 değerleri saklanmadı. İçerik (ad, metot, URL, gövde, header, auth, değişken) doğru kaydedildi. Bu yüzden doğrulama item id'sine
+  değil yapıya göre yapılır (bkz. ADR 0005). `PUT` ile id'lerin korunup korunmadığı ayrıca doğrulanmadı; doğrulama buna bağlı değildir.
 - Yazma yetkisi (API key'in bu workspace'e koleksiyon yazıp yazamadığı) T21'deki kontrolle sınanmaz.
 - Hiçbir şey gerçek Postman'a karşı çalıştırılmadı; testler belgelenen davranışı taklit eden bellek içi bir Postman kullanır.
 
