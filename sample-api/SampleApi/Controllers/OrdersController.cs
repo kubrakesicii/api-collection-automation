@@ -9,6 +9,10 @@ namespace SampleApi.Controllers;
 [Route("api/[controller]")]
 public sealed class OrdersController(InMemoryStore<Order> store) : ControllerBase
 {
+    [HttpGet("{id:int}")]
+    public ActionResult<OrderResponse> GetById(int id) =>
+        store.Get(id) is { } order ? ToResponse(order) : NotFound();
+
     [HttpPost]
     public ActionResult<OrderResponse> Create(CreateOrderRequest request)
     {

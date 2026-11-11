@@ -18,5 +18,8 @@ public sealed class ProductsController(InMemoryStore<Product> store) : Controlle
         return ToResponse(product);
     }
 
+    [HttpDelete("{id:int}")]
+    public IActionResult Delete(int id) => store.Remove(id) ? NoContent() : NotFound();
+
     private static ProductResponse ToResponse(Product p) => new(p.Id, p.Name, p.Price);
 }

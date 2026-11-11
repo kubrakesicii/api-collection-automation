@@ -9,6 +9,10 @@ namespace SampleApi.Controllers;
 [Route("api/[controller]")]
 public sealed class CustomersController(InMemoryStore<Customer> store) : ControllerBase
 {
+    [HttpGet]
+    public ActionResult<IEnumerable<CustomerResponse>> GetAll() =>
+        Ok(store.GetAll().Select(ToResponse));
+
     [HttpDelete("{id:int}")]
     public IActionResult Delete(int id) => store.Remove(id) ? NoContent() : NotFound();
 
