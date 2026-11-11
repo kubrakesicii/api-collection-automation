@@ -17,7 +17,8 @@ public sealed class OrdersController(InMemoryStore<Order> store) : ControllerBas
             CustomerId = request.CustomerId,
             ProductId = request.ProductId,
             Quantity = request.Quantity,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            Note = request.Note
         });
         return CreatedAtAction("Get", new { id = order.Id }, ToResponse(order));
     }

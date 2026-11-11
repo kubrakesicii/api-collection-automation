@@ -24,6 +24,7 @@ public sealed class Order : IEntity
     public int Id { get; set; }
     public int CustomerId { get; set; }
     public int ProductId { get; set; }
+    public string Note { get; set; }
     public int Quantity { get; set; }
     public DateTime CreatedAt { get; set; }
 }
