@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 2,
+  "identityVersion": 1,
+  "collection": {
+    "fileName": "api.postman_collection.json",
+    "sha256": "54c3a7337e5407d36f6e4361a1c6fcab07286382c93bf782a6e65a3e4b61fbb4"
+  },
+  "endpoints": [
+    {
+      "id": "GET /api/customers/{:int}",
+      "fingerprint": "060241cc48f408e68547bc0dc39a0597b02e3a26008ddc062e5baaa14de155e8",
+      "httpMethod": "GET",
+      "route": "api/Customers/{id:int}",
+      "controllerName": "Customers",
+      "actionName": "GetById",
+      "contract": {
+        "auth.required": "false",
+        "endpoint.action": "GetById",
+        "endpoint.controller": "Customers",
+        "endpoint.route": "api/Customers/{id:int}",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int"
+      }
+    },
+    {
+      "id": "POST /api/orders",
+      "fingerprint": "9769c819d31351ab5dd0a2f1333a87fe82d0e522a7913a5f85066179a6288b07",
+      "httpMethod": "POST",
+      "route": "api/Orders",
+      "controllerName": "Orders",
+      "actionName": "Create",
+      "contract": {
+        "auth.required": "false",
+        "body.contentType": "application/json",
+        "body.example": "{\"customerId\":1,\"productId\":1,\"quantity\":2}",
+        "body.exampleComplete": "true",
+        "body.propertyOrder[].names": "CustomerId,ProductId,Quantity",
+        "body.property[CustomerId].nullable": "false",
+        "body.property[CustomerId].required": "false",
+        "body.property[CustomerId].type": "int",
+        "body.property[ProductId].nullable": "false",
+        "body.property[ProductId].required": "false",
+        "body.property[ProductId].type": "int",
+        "body.property[Quantity].nullable": "false",
+        "body.property[Quantity].required": "false",
+        "body.property[Quantity].type": "int",
+        "body.required": "true",
+        "body.type": "CreateOrderRequest",
+        "endpoint.action": "Create",
+        "endpoint.controller": "Orders",
+        "endpoint.route": "api/Orders",
+        "parameter[body:request].required": "true",
+        "parameter[body:request].type": "CreateOrderRequest"
+      }
+    },
+    {
+      "id": "PUT /api/products/{:int}",
+      "fingerprint": "e33cfc7c3d8e52bdff7f53a679258d4f37d9aca413fd8f3710649e895487c001",
+      "httpMethod": "PUT",
+      "route": "api/Products/{id:int}",
+      "controllerName": "Products",
+      "actionName": "Update",
+      "contract": {
+        "auth.required": "false",
+        "body.contentType": "application/json",
+        "body.example": "{\"name\":\"Laptop Pro\",\"price\":1499.9}",
+        "body.exampleComplete": "true",
+        "body.propertyOrder[].names": "Name,Price",
+        "body.property[Name].nullable": "false",
+        "body.property[Name].required": "true",
+        "body.property[Name].type": "string",
+        "body.property[Price].nullable": "false",
+        "body.property[Price].required": "false",
+        "body.property[Price].type": "decimal",
+        "body.required": "true",
+        "body.type": "UpdateProductRequest",
+        "endpoint.action": "Update",
+        "endpoint.controller": "Products",
+        "endpoint.route": "api/Products/{id:int}",
+        "parameter[body:request].required": "true",
+        "parameter[body:request].type": "UpdateProductRequest",
+        "parameter[path:id].required": "true",
+        "parameter[path:id].type": "int",
+        "parameters.order": "path:id,body:request"
+      }
+    }
+  ]
+}

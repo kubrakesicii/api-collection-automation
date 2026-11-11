@@ -1,0 +1,150 @@
+{
+  "info": {
+    "name": "SampleAPI",
+    "description": "Generated from endpoint metadata. Set the `baseUrl` variable and, for protected endpoints, the `token` variable.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Customers",
+      "id": "5e597186-94c7-59fa-a9e8-9f43ee54a520",
+      "item": [
+        {
+          "name": "GetById",
+          "id": "19c9b579-597d-578e-a708-f061ab9cf371",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/Customers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Customers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "description": "**GET** `/api/Customers/{id:int}`\n\nController: `Customers` · Action: `GetById`\n\nParameters:\n- `id` (path): int, required"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "id": "a1c7b99d-5e98-561b-9416-a9c54f101ff5",
+      "item": [
+        {
+          "name": "Create",
+          "id": "55e8fdec-4930-589c-95e8-213efd1c030e",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/Orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": 1,\n  \"productId\": 1,\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "**POST** `/api/Orders`\n\nController: `Orders` · Action: `Create`\n\nBody example (complete); sources:\n- `CustomerId`: ExternalMetadata (examples.sample-api.json: properties[CreateOrderRequest.CustomerId])\n- `ProductId`: ExternalMetadata (examples.sample-api.json: properties[CreateOrderRequest.ProductId])\n- `Quantity`: ExternalMetadata (examples.sample-api.json: properties[CreateOrderRequest.Quantity])"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "id": "b5b2b2c0-ffa2-5e37-be32-2b4ad952ac0c",
+      "item": [
+        {
+          "name": "Update",
+          "id": "845cdb53-69b2-5fca-a5e6-09b6b9dfab9d",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/Products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "Products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "int, required"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Laptop Pro\",\n  \"price\": 1499.9\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "**PUT** `/api/Products/{id:int}`\n\nController: `Products` · Action: `Update`\n\nParameters:\n- `id` (path): int, required\n\nBody example (complete); sources:\n- `Name`: ExternalMetadata (examples.sample-api.json: properties[UpdateProductRequest.Name])\n- `Price`: ExternalMetadata (examples.sample-api.json: properties[UpdateProductRequest.Price])"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "description": "Base address of the API."
+    },
+    {
+      "key": "token",
+      "value": "",
+      "description": "Bearer token for protected endpoints. Never commit a real token."
+    },
+    {
+      "key": "automationManaged",
+      "value": "api-collection-automation",
+      "description": "Marks this collection as maintained by api-collection-automation. Keep it: it is how the tool recognises its own collection instead of creating a duplicate."
+    }
+  ]
+}
